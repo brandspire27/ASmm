@@ -76,6 +76,26 @@ export interface CampaignAnalytics {
   createdAt: string
 }
 
+export interface WorkspaceSummary {
+  workspaceId: string
+  organizationId: string
+  organizationName: string
+  workspaceName: string
+  roleKey: string
+}
+
+export interface BrandProfile {
+  id: string
+  workspaceId: string
+  name: string
+  industry: string
+  websiteUrl: string
+  companyDescription: string
+  targetAudience: string
+  brandVoice: string
+  brandColors: string[]
+}
+
 interface AgencyUser {
   id: string
   email: string
@@ -85,6 +105,10 @@ interface AgencyUser {
 interface AppState {
   clients: Client[]
   activeClientId: string | null
+  workspaces: WorkspaceSummary[]
+  activeWorkspaceId: string | null
+  activeRole: string | null
+  brandProfile: BrandProfile | null
   providers: AIProviderState
   contentList: GeneratedContent[]
   analytics: CampaignAnalytics[]
@@ -96,8 +120,15 @@ interface AppContextType {
   isLoading: boolean
   isConfigured: boolean
   connectionError: string | null
-  login: (email: string, password: string) => Promise<void>
+  signUp: (name: string, email: string, password: string) => Promise<boolean>
+  login: (email: string, password: string) => Promise<boolean>
+  signInWithGoogle: () => Promise<void>
   logout: () => Promise<void>
+  createOrganization: (name: string, workspaceName: string) => Promise<void>
+  createWorkspace: (organizationId: string, name: string, timezone: string) => Promise<void>
+  inviteWorkspaceMember: (email: string, roleKey: string) => Promise<string>
+  switchWorkspace: (workspaceId: string) => Promise<void>
+  updateBrandProfile: (profile: Omit<BrandProfile, "id" | "workspaceId">) => Promise<void>
   addClient: (
     name: string,
     companyDescription: string,
@@ -140,6 +171,11 @@ interface AppContextType {
   ) => Promise<void>
 }
 
+interface WorkspaceLoadResult {
+  hasWorkspace: boolean
+  error: string | null
+}
+
 const DEFAULT_PROVIDERS: AIProviderState = {
   text: {
     sequence: ["Gemini", "Groq", "OpenRouter", "Cloudflare AI"],
@@ -161,6 +197,10 @@ const DEFAULT_PROVIDERS: AIProviderState = {
 const EMPTY_STATE: AppState = {
   clients: [],
   activeClientId: null,
+  workspaces: [],
+  activeWorkspaceId: null,
+  activeRole: null,
+  brandProfile: null,
   providers: DEFAULT_PROVIDERS,
   contentList: [],
   analytics: [],
@@ -169,6 +209,7 @@ const EMPTY_STATE: AppState = {
 
 type ClientRow = Database["public"]["Tables"]["clients"]["Row"]
 type AssetRow = Database["public"]["Tables"]["brand_assets"]["Row"]
+type BrandProfileRow = Database["public"]["Tables"]["brand_profiles"]["Row"]
 type ContentRow = Database["public"]["Tables"]["generated_content"]["Row"]
 type CampaignRow = Database["public"]["Tables"]["campaign_analytics"]["Row"]
 
@@ -279,20 +320,38 @@ function providersToJson(providers: AIProviderState): Json {
   }
 }
 
-async function readWorkspace(user: AgencyUser): Promise<AppState> {
+async function readWorkspace(user: AgencyUser, preferredWorkspaceId?: string): Promise<AppState> {
   const supabase = getRequiredClient()
-  const { data: isMember, error: membershipError } = await supabase.rpc("is_agency_member")
-  if (membershipError) throw membershipError
-  if (!isMember) {
-    throw new Error("This account has not been added to the agency workspace. Ask an admin to grant access.")
+  const { data: workspaceRows, error: workspaceError } = await supabase.rpc("get_my_workspaces")
+  if (workspaceError) throw workspaceError
+
+  const workspaces: WorkspaceSummary[] = (workspaceRows ?? []).map((row) => ({
+    workspaceId: row.workspace_id,
+    organizationId: row.organization_id,
+    organizationName: row.organization_name,
+    workspaceName: row.workspace_name,
+    roleKey: row.role_key
+  }))
+
+  if (workspaces.length === 0) {
+    return { ...EMPTY_STATE, currentUser: user }
   }
 
-  const [clientsResult, assetsResult, contentResult, analyticsResult, settingsResult] = await Promise.all([
-    supabase.from("clients").select("*").order("created_at", { ascending: false }),
-    supabase.from("brand_assets").select("*").order("uploaded_at", { ascending: false }),
-    supabase.from("generated_content").select("*").order("created_at", { ascending: false }),
-    supabase.from("campaign_analytics").select("*").order("created_at", { ascending: false }),
-    supabase.from("agency_settings").select("providers").eq("id", 1).maybeSingle()
+  const selectedWorkspace = preferredWorkspaceId
+    ? workspaces.find((workspace) => workspace.workspaceId === preferredWorkspaceId)
+    : workspaces[0]
+  if (!selectedWorkspace) {
+    throw new Error("You do not have access to the selected workspace.")
+  }
+  const workspaceId = selectedWorkspace.workspaceId
+
+  const [clientsResult, assetsResult, contentResult, analyticsResult, settingsResult, profileResult] = await Promise.all([
+    supabase.from("clients").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
+    supabase.from("brand_assets").select("*").eq("workspace_id", workspaceId).order("uploaded_at", { ascending: false }),
+    supabase.from("generated_content").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
+    supabase.from("campaign_analytics").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
+    supabase.from("workspace_settings").select("providers").eq("workspace_id", workspaceId).maybeSingle(),
+    supabase.from("brand_profiles").select("*").eq("workspace_id", workspaceId).order("created_at").limit(1).maybeSingle()
   ])
 
   if (clientsResult.error) throw clientsResult.error
@@ -300,6 +359,7 @@ async function readWorkspace(user: AgencyUser): Promise<AppState> {
   if (contentResult.error) throw contentResult.error
   if (analyticsResult.error) throw analyticsResult.error
   if (settingsResult.error) throw settingsResult.error
+  if (profileResult.error) throw profileResult.error
 
   const assetRows = assetsResult.data ?? []
   const assetsByClient = new Map<string, BrandAsset[]>()
@@ -358,6 +418,10 @@ async function readWorkspace(user: AgencyUser): Promise<AppState> {
   return {
     clients,
     activeClientId: clients[0]?.id ?? null,
+    workspaces,
+    activeWorkspaceId: workspaceId,
+    activeRole: selectedWorkspace.roleKey,
+    brandProfile: profileResult.data ? mapBrandProfile(profileResult.data) : null,
     providers: parseProviders(settingsResult.data?.providers),
     contentList,
     analytics,
@@ -419,23 +483,41 @@ function mapCampaign(row: CampaignRow): CampaignAnalytics {
   }
 }
 
+function mapBrandProfile(row: BrandProfileRow): BrandProfile {
+  return {
+    id: row.id,
+    workspaceId: row.workspace_id,
+    name: row.name,
+    industry: row.industry,
+    websiteUrl: row.website_url ?? "",
+    companyDescription: row.company_description,
+    targetAudience: row.target_audience,
+    brandVoice: row.brand_voice,
+    brandColors: row.brand_colors
+  }
+}
+
 export function AppStateProvider({ children }: { children: React.ReactNode }) {
   const supabase = createClient()
   const [state, setState] = useState<AppState>(EMPTY_STATE)
   const [isLoading, setIsLoading] = useState(isSupabaseConfigured())
   const [connectionError, setConnectionError] = useState<string | null>(null)
 
-  const loadWorkspace = useCallback(async (user: AgencyUser | null, showLoading = true) => {
+  const loadWorkspace = useCallback(async (
+    user: AgencyUser | null,
+    showLoading = true,
+    preferredWorkspaceId?: string
+  ): Promise<WorkspaceLoadResult> => {
     if (!user) {
       setState(EMPTY_STATE)
       setConnectionError(null)
       setIsLoading(false)
-      return null
+      return { hasWorkspace: false, error: null }
     }
 
     if (showLoading) setIsLoading(true)
     try {
-      const workspace = await readWorkspace(user)
+      const workspace = await readWorkspace(user, preferredWorkspaceId)
       setState((previous) => ({
         ...workspace,
         activeClientId: previous.activeClientId &&
@@ -445,13 +527,13 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       }))
       setConnectionError(null)
       if (showLoading) setIsLoading(false)
-      return null
+      return { hasWorkspace: Boolean(workspace.activeWorkspaceId), error: null }
     } catch (error) {
       const message = errorText(error)
       setState((previous) => ({ ...previous, currentUser: user }))
       setConnectionError(message)
       if (showLoading) setIsLoading(false)
-      return message
+      return { hasWorkspace: false, error: message }
     }
   }, [])
 
@@ -490,21 +572,23 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   const userId = state.currentUser?.id
   const userEmail = state.currentUser?.email
   const userName = state.currentUser?.name
+  const activeWorkspaceId = state.activeWorkspaceId
 
   useEffect(() => {
-    if (!supabase || !userId || !userEmail || !userName) return
+    if (!supabase || !userId || !userEmail || !userName || !activeWorkspaceId) return
 
     const user = { id: userId, email: userEmail, name: userName }
     const reload = () => {
-      void loadWorkspace(user, false)
+      void loadWorkspace(user, false, activeWorkspaceId)
     }
     const channel = supabase
       .channel("agency-workspace-changes")
-      .on("postgres_changes", { event: "*", schema: "public", table: "clients" }, reload)
-      .on("postgres_changes", { event: "*", schema: "public", table: "brand_assets" }, reload)
-      .on("postgres_changes", { event: "*", schema: "public", table: "generated_content" }, reload)
-      .on("postgres_changes", { event: "*", schema: "public", table: "campaign_analytics" }, reload)
-      .on("postgres_changes", { event: "*", schema: "public", table: "agency_settings" }, reload)
+      .on("postgres_changes", { event: "*", schema: "public", table: "clients", filter: `workspace_id=eq.${activeWorkspaceId}` }, reload)
+      .on("postgres_changes", { event: "*", schema: "public", table: "brand_assets", filter: `workspace_id=eq.${activeWorkspaceId}` }, reload)
+      .on("postgres_changes", { event: "*", schema: "public", table: "generated_content", filter: `workspace_id=eq.${activeWorkspaceId}` }, reload)
+      .on("postgres_changes", { event: "*", schema: "public", table: "campaign_analytics", filter: `workspace_id=eq.${activeWorkspaceId}` }, reload)
+      .on("postgres_changes", { event: "*", schema: "public", table: "brand_profiles", filter: `workspace_id=eq.${activeWorkspaceId}` }, reload)
+      .on("postgres_changes", { event: "*", schema: "public", table: "workspace_settings", filter: `workspace_id=eq.${activeWorkspaceId}` }, reload)
       .subscribe((status) => {
         if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
           setConnectionError("Live workspace updates disconnected. Refresh the page to reconnect.")
@@ -516,7 +600,26 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       window.clearInterval(signedUrlRefresh)
       void supabase.removeChannel(channel)
     }
-  }, [supabase, userId, userEmail, userName, loadWorkspace])
+  }, [supabase, userId, userEmail, userName, activeWorkspaceId, loadWorkspace])
+
+  const signUp = async (name: string, email: string, password: string) => {
+    const client = getRequiredClient()
+    const { data, error } = await client.auth.signUp({
+      email,
+      password,
+      options: {
+        data: { full_name: name },
+        emailRedirectTo: `${window.location.origin}/auth/callback?next=/onboarding`
+      }
+    })
+    if (error) throw error
+    if (!data.user) throw new Error("Supabase did not return a registered user.")
+    if (data.session) {
+      const workspaceResult = await loadWorkspace(userFromAuth(data.user))
+      if (workspaceResult.error) throw new Error(workspaceResult.error)
+    }
+    return !data.session
+  }
 
   const login = async (email: string, password: string) => {
     const client = getRequiredClient()
@@ -524,16 +627,26 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     if (error) throw error
     if (!data.user) throw new Error("Supabase did not return an authenticated user.")
 
-    const workspaceError = await loadWorkspace(userFromAuth(data.user))
-    if (workspaceError) {
+    const workspaceResult = await loadWorkspace(userFromAuth(data.user))
+    if (workspaceResult.error) {
       const { error: signOutError } = await client.auth.signOut()
       setState(EMPTY_STATE)
-      setConnectionError(workspaceError)
+      setConnectionError(workspaceResult.error)
       if (signOutError) {
-        throw new Error(`${workspaceError} Sign-out also failed: ${signOutError.message}`)
+        throw new Error(`${workspaceResult.error} Sign-out also failed: ${signOutError.message}`)
       }
-      throw new Error(workspaceError)
+      throw new Error(workspaceResult.error)
     }
+    return !workspaceResult.hasWorkspace
+  }
+
+  const signInWithGoogle = async () => {
+    const client = getRequiredClient()
+    const { error } = await client.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: `${window.location.origin}/auth/callback?next=/onboarding` }
+    })
+    if (error) throw error
   }
 
   const logout = async () => {
@@ -543,6 +656,78 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     setState(EMPTY_STATE)
   }
 
+  const createOrganization = async (name: string, workspaceName: string) => {
+    const client = getRequiredClient()
+    const { data, error } = await client.rpc("create_organization", {
+      p_organization_name: name,
+      p_workspace_name: workspaceName
+    })
+    if (error) throw error
+    const workspaceId = data?.[0]?.workspace_id
+    if (!workspaceId || !state.currentUser) {
+      throw new Error("The organization was created, but its workspace could not be loaded.")
+    }
+    const workspaceResult = await loadWorkspace(state.currentUser, true, workspaceId)
+    if (workspaceResult.error) throw new Error(workspaceResult.error)
+    if (!workspaceResult.hasWorkspace) throw new Error("The new workspace could not be loaded.")
+  }
+
+  const createWorkspace = async (organizationId: string, name: string, timezone: string) => {
+    const client = getRequiredClient()
+    const { data: workspaceId, error } = await client.rpc("create_workspace", {
+      p_organization_id: organizationId,
+      p_workspace_name: name,
+      p_timezone: timezone
+    })
+    if (error) throw error
+    if (!state.currentUser) throw new Error("Sign in before creating a workspace.")
+    const workspaceResult = await loadWorkspace(state.currentUser, true, workspaceId)
+    if (workspaceResult.error) throw new Error(workspaceResult.error)
+    if (!workspaceResult.hasWorkspace) throw new Error("The new workspace could not be loaded.")
+  }
+
+  const inviteWorkspaceMember = async (email: string, roleKey: string) => {
+    const response = await fetch("/api/workspace-invitations", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ workspaceId: state.activeWorkspaceId, email, roleKey })
+    })
+    const result = await response.json() as { message?: string; error?: string }
+    if (!response.ok) throw new Error(result.error ?? "Unable to send the workspace invitation.")
+    if (!result.message) throw new Error("The invitation endpoint returned an invalid response.")
+    return result.message
+  }
+
+  const switchWorkspace = async (workspaceId: string) => {
+    if (!state.currentUser) throw new Error("Sign in before switching workspaces.")
+    const workspaceResult = await loadWorkspace(state.currentUser, true, workspaceId)
+    if (workspaceResult.error) throw new Error(workspaceResult.error)
+    if (!workspaceResult.hasWorkspace) throw new Error("The selected workspace could not be loaded.")
+  }
+
+  const updateBrandProfile = async (profile: Omit<BrandProfile, "id" | "workspaceId">) => {
+    const client = getRequiredClient()
+    const workspaceId = state.activeWorkspaceId
+    if (!workspaceId) throw new Error("Create or select a workspace before saving a brand profile.")
+
+    const payload = {
+      workspace_id: workspaceId,
+      name: profile.name.trim(),
+      industry: profile.industry.trim(),
+      website_url: profile.websiteUrl.trim() || null,
+      company_description: profile.companyDescription.trim(),
+      target_audience: profile.targetAudience.trim(),
+      brand_voice: profile.brandVoice.trim(),
+      brand_colors: profile.brandColors
+    }
+    const query = state.brandProfile
+      ? client.from("brand_profiles").update(payload).eq("id", state.brandProfile.id)
+      : client.from("brand_profiles").insert(payload)
+    const { data, error } = await query.select("*").single()
+    if (error) throw error
+    setState((previous) => ({ ...previous, brandProfile: mapBrandProfile(data) }))
+  }
+
   const addClient = async (
     name: string,
     companyDescription: string,
@@ -550,9 +735,12 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     brandColors: string[]
   ) => {
     const client = getRequiredClient()
+    const workspaceId = state.activeWorkspaceId
+    if (!workspaceId) throw new Error("Select a workspace before adding a client.")
     const { data, error } = await client
       .from("clients")
       .insert({
+        workspace_id: workspaceId,
         name,
         company_description: companyDescription,
         target_audience: targetAudience,
@@ -578,9 +766,11 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     url: string
   ) => {
     const client = getRequiredClient()
+    const workspaceId = state.activeWorkspaceId
+    if (!workspaceId) throw new Error("Select a workspace before adding a brand asset.")
     const { data, error } = await client
       .from("brand_assets")
-      .insert({ client_id: clientId, name, type, url })
+      .insert({ workspace_id: workspaceId, client_id: clientId, name, type, url })
       .select("*")
       .single()
     if (error) throw error
@@ -590,6 +780,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         .from("clients")
         .update({ logo_url: url, logo_storage_path: null })
         .eq("id", clientId)
+        .eq("workspace_id", workspaceId)
       if (logoError) throw logoError
     }
 
@@ -615,9 +806,11 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     const client = getRequiredClient()
     const user = state.currentUser
     if (!user) throw new Error("Sign in before uploading a brand asset.")
+    const workspaceId = state.activeWorkspaceId
+    if (!workspaceId) throw new Error("Select a workspace before uploading a brand asset.")
 
     const safeFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, "-")
-    const storagePath = `${user.id}/${crypto.randomUUID()}-${safeFileName}`
+    const storagePath = `${workspaceId}/${user.id}/${crypto.randomUUID()}-${safeFileName}`
     const { error: uploadError } = await client.storage
       .from(STORAGE_BUCKET)
       .upload(storagePath, file, { contentType: file.type, upsert: false })
@@ -625,7 +818,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
 
     const { data, error } = await client
       .from("brand_assets")
-      .insert({ client_id: clientId, name, type, storage_path: storagePath })
+      .insert({ workspace_id: workspaceId, client_id: clientId, name, type, storage_path: storagePath })
       .select("*")
       .single()
     if (error) {
@@ -641,6 +834,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         .from("clients")
         .update({ logo_url: null, logo_storage_path: storagePath })
         .eq("id", clientId)
+        .eq("workspace_id", workspaceId)
       if (logoError) throw logoError
     }
 
@@ -660,6 +854,8 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
 
   const deleteBrandAsset = async (clientId: string, assetId: string) => {
     const client = getRequiredClient()
+    const workspaceId = state.activeWorkspaceId
+    if (!workspaceId) throw new Error("Select a workspace before deleting a brand asset.")
     const storedClient = state.clients.find((item) => item.id === clientId)
     if (!storedClient) throw new Error("The selected client was not found in this workspace.")
     const assetToDelete = storedClient?.assets.find((asset) => asset.id === assetId)
@@ -676,6 +872,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           logo_storage_path: replacementLogo?.storagePath ?? null
         })
         .eq("id", clientId)
+        .eq("workspace_id", workspaceId)
       if (logoError) throw logoError
     }
 
@@ -684,6 +881,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       .delete()
       .eq("id", assetId)
       .eq("client_id", clientId)
+      .eq("workspace_id", workspaceId)
       .select("storage_path")
       .single()
     if (error) throw error
@@ -717,9 +915,12 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
 
   const updateProviders = async (providers: AIProviderState) => {
     const client = getRequiredClient()
-    const { error } = await client.from("agency_settings").upsert({
-      id: 1,
+    const workspaceId = state.activeWorkspaceId
+    if (!workspaceId) throw new Error("Select a workspace before updating settings.")
+    const { error } = await client.from("workspace_settings").upsert({
+      workspace_id: workspaceId,
       providers: providersToJson(providers),
+      updated_by: state.currentUser?.id ?? null,
       updated_at: new Date().toISOString()
     })
     if (error) throw error
@@ -794,6 +995,8 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     additionalMeta?: GeneratedContentMeta
   ) => {
     const client = getRequiredClient()
+    const workspaceId = state.activeWorkspaceId
+    if (!workspaceId) throw new Error("Select a workspace before generating content.")
     const activeClient = state.clients.find((item) => item.id === clientId)
     if (!activeClient) throw new Error("The selected client no longer exists.")
     const providerUsed = "Template demo (AI API not connected)"
@@ -812,9 +1015,9 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
 2. Launch daily ad scripts pointing to direct landing pages.
 3. Keep hashtags clean and conversion-driven.`
     } else if (type === "caption") {
-      generatedText = `🚀 Ready to boost results for ${activeClient.name}? ${prompt}. Formulated specifically with high intent. Zero filler. Click the link in bio! #Marketing #Automation #AgencyOS`
+      generatedText = `Ready to boost results for ${activeClient.name}? ${prompt}. This draft is generated from the current template and needs review before publishing. #Marketing #BrandSpireSocialAI`
     } else if (type === "hashtag") {
-      generatedText = `#${activeClient.name.replace(/\s+/g, "")} #DigitalMarketing #AIAutomation #GrowBrand #AgencyOSLite #PerformanceDriven`
+      generatedText = `#${activeClient.name.replace(/\s+/g, "")} #DigitalMarketing #BrandSpireSocialAI #GrowBrand`
     } else if (type === "ad_script") {
       generatedText = `[SCENE 1: Visual of ${activeClient.name} primary assets]
 Narrator: "Tired of the same old standard templates?"
@@ -842,6 +1045,7 @@ Narrator: "Click the button below to get started now!"`
     }
 
     const { data, error } = await client.from("generated_content").insert({
+      workspace_id: workspaceId,
       client_id: clientId,
       client_name: activeClient.name,
       type,
@@ -868,7 +1072,12 @@ Narrator: "Click the button below to get started now!"`
 
   const updateContentStatus = async (id: string, status: GeneratedContent["status"]) => {
     const client = getRequiredClient()
-    const { error } = await client.from("generated_content").update({ status }).eq("id", id)
+    const workspaceId = state.activeWorkspaceId
+    if (!workspaceId) throw new Error("Select a workspace before updating content.")
+    const { error } = await client.from("generated_content")
+      .update({ status })
+      .eq("id", id)
+      .eq("workspace_id", workspaceId)
     if (error) throw error
     setState((previous) => ({
       ...previous,
@@ -880,6 +1089,8 @@ Narrator: "Click the button below to get started now!"`
     campaign: Omit<CampaignAnalytics, "id" | "ctr" | "conversionRate" | "createdAt">
   ) => {
     const client = getRequiredClient()
+    const workspaceId = state.activeWorkspaceId
+    if (!workspaceId) throw new Error("Select a workspace before creating campaign metrics.")
     const ctr = campaign.impressions > 0
       ? Number(((campaign.clicks / campaign.impressions) * 100).toFixed(2))
       : 0
@@ -887,6 +1098,7 @@ Narrator: "Click the button below to get started now!"`
       ? Number(((campaign.conversions / campaign.clicks) * 100).toFixed(2))
       : 0
     const { data, error } = await client.from("campaign_analytics").insert({
+      workspace_id: workspaceId,
       client_id: campaign.clientId,
       campaign_name: campaign.campaignName,
       impressions: campaign.impressions,
@@ -910,8 +1122,15 @@ Narrator: "Click the button below to get started now!"`
         isLoading,
         isConfigured: isSupabaseConfigured(),
         connectionError,
+        signUp,
         login,
+        signInWithGoogle,
         logout,
+        createOrganization,
+        createWorkspace,
+        inviteWorkspaceMember,
+        switchWorkspace,
+        updateBrandProfile,
         addClient,
         addBrandAsset,
         uploadBrandAsset,

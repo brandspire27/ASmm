@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 })
 
 export const metadata: Metadata = {
-  title: "AgencyOS Lite - AI Marketing Agency Operating System",
-  description: "Internal production tool to manage clients and automate digital marketing using AI.",
+  title: "BrandSpire Social AI",
+  description: "AI-powered social media management and marketing workspace.",
 }
 
 export default function RootLayout({

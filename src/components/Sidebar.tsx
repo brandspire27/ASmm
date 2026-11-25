@@ -17,17 +17,20 @@ import {
   LogOut,
   ChevronDown,
   Building,
+  Settings2,
   Radio,
   Image as ImageIcon
 } from "lucide-react"
 
-export default function Sidebar() {
-  const { state, setActiveClient, logout } = useAppState()
+export default function Sidebar({ onNavigate = () => {} }: { onNavigate?: () => void }) {
+  const { state, setActiveClient, switchWorkspace, logout } = useAppState()
   const pathname = usePathname()
   const router = useRouter()
 
   const navItems = [
     { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+    { label: "Brand Profile", href: "/brand", icon: Building },
+    { label: "Workspaces", href: "/workspaces", icon: Settings2 },
     { label: "Client Manager", href: "/clients", icon: Users },
     { label: "Brand Assets", href: "/assets", icon: Briefcase },
     { label: "AI Router", href: "/router", icon: Cpu },
@@ -48,6 +51,14 @@ export default function Sidebar() {
     }
   }
 
+  const handleWorkspaceChange = async (workspaceId: string) => {
+    try {
+      await switchWorkspace(workspaceId)
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : "Unable to switch workspace.")
+    }
+  }
+
   return (
     <aside className="w-64 flex-col border-r border-border bg-card flex h-screen sticky top-0">
       {/* Brand Header */}
@@ -56,11 +67,34 @@ export default function Sidebar() {
           <BrandLogo className="h-7 w-auto max-w-full object-contain" />
         </div>
         <div>
-          <h1 className="text-sm font-bold text-foreground tracking-tight">AgencyOS Lite</h1>
+          <h1 className="text-sm font-bold text-foreground tracking-tight">BrandSpire Social AI</h1>
           <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest font-mono">
-            Internal Hub
+            Workspace Hub
           </span>
         </div>
+      </div>
+
+      <div className="border-b border-border bg-secondary/20 p-4">
+        <label htmlFor="active-workspace" className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+          Active Workspace
+        </label>
+        <select
+          id="active-workspace"
+          value={state.activeWorkspaceId ?? ""}
+          onChange={(event) => void handleWorkspaceChange(event.target.value)}
+          className="w-full rounded-md border border-border bg-card px-2 py-2 text-xs font-medium text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+        >
+          {state.workspaces.map((workspace) => (
+            <option key={workspace.workspaceId} value={workspace.workspaceId}>
+              {workspace.organizationName} / {workspace.workspaceName}
+            </option>
+          ))}
+        </select>
+        {state.activeRole && (
+          <p className="mt-1.5 text-[10px] capitalize text-muted-foreground">
+            Role: {state.activeRole.replaceAll("_", " ")}
+          </p>
+        )}
       </div>
 
       {/* Active Client Selector */}
@@ -110,6 +144,7 @@ export default function Sidebar() {
             <Link
               key={item.href}
               href={item.href}
+              onClick={onNavigate}
               className={`flex items-center gap-3 px-3 py-2 rounded-md text-xs font-medium transition-colors ${
                 isActive
                   ? "bg-primary text-primary-foreground font-semibold"
