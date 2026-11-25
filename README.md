@@ -36,7 +36,7 @@ Deploy the Next.js app to Vercel or another Node-compatible Next.js host. Config
 
 ## Current integration limits
 
-Supabase authentication, workspace membership, role-based database access, storage, and Realtime are implemented in the app, but the new Phase 1 migration must be applied to the Supabase project before these workspace flows can work. No live Supabase project was available for end-to-end testing.
+Supabase authentication, workspace membership, role-based database access, storage, and Realtime are implemented in the app. The configured Supabase project has been tested through the local app for organization/workspace creation and brand-profile save/reload. Separate-user RLS isolation, file upload/download, Realtime, and the production Vercel deployment still need verification.
 
 AI text/image generation, video rendering, social publishing, and social-platform analytics are not connected to external providers yet. Generated content and video previews are demo/template output; campaign metrics are manually entered. See [`PROJECT_STATUS.md`](./PROJECT_STATUS.md) for what is implemented and what remains.
 

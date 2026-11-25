@@ -44,6 +44,6 @@ Phase 1 does not connect AI providers, social networks, publishing, background s
 
 ## Deployment status
 
-The code can build, but Phase 1 is not live-ready until the migration is applied and the Supabase Auth/email and hosting settings are configured. No project credentials were available to perform that live validation. See [`PROJECT_STATUS.md`](../PROJECT_STATUS.md) and [`README.md`](../README.md).
+The configured Supabase project has passed a local browser check for organization/workspace creation and brand-profile persistence after reload. This is not a full tenant-isolation test and does not confirm the Vercel production deployment. See [`PROJECT_STATUS.md`](../PROJECT_STATUS.md) and [`README.md`](../README.md).
 
 For source-backed access and pricing constraints, see the [platform API matrix](./PLATFORM_API_MATRIX.md) and [infrastructure comparison](./INFRASTRUCTURE_COMPARISON.md).

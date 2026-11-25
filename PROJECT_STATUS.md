@@ -2,9 +2,9 @@
 
 ## Current release
 
-Phase 1 foundation is implemented in the codebase but is not yet ready to deploy to the existing Supabase project. Apply the Phase 1 migration first and validate authentication, RLS, storage, and Realtime against the target project.
+Phase 1 foundation is implemented and pushed to `main` in commit `078abd6`. The configured Supabase project was reached through the local app: organization/workspace setup succeeded, and brand-profile data remained after save and reload. Vercel production deployment and the remaining integration checks are not yet verified.
 
-These Phase 1 changes have not been committed, pushed, or deployed. The existing production database has not been migrated.
+The Phase 1 migration has been applied successfully to the Supabase project configured for the local app. Confirm that this is the intended production project before relying on the production deployment.
 
 ## Implemented in code
 
@@ -15,11 +15,12 @@ These Phase 1 changes have not been committed, pushed, or deployed. The existing
 - Private file storage and database-enforced workspace access policies.
 - Responsive navigation and Supabase Realtime subscriptions.
 
-## Not yet verified against a live Supabase project
+## Not yet verified
 
-- The Phase 1 migration has not been applied to the user's Supabase project or executed against a local PostgreSQL/Supabase instance.
-- Signup confirmation, password reset, Google OAuth, team invitations, multi-tenant isolation, file access, and Realtime have not been tested end to end.
-- Vercel deployment settings, Auth redirect allowlists, and the server-only invitation key must be configured by the project owner.
+- Separate-user/organization RLS isolation, file upload/download, and Realtime have not been tested end to end.
+- Signup confirmation, password recovery, and Google OAuth have not been independently tested from their email/provider links.
+- Team invitations were not tested; they require `SUPABASE_SERVICE_ROLE_KEY`, which was intentionally omitted because invitations are not needed.
+- The Vercel production deployment and its Auth redirect allowlist have not been verified.
 
 ## Not implemented as production integrations
 
@@ -34,15 +35,14 @@ These Phase 1 changes have not been committed, pushed, or deployed. The existing
 - Targeted ESLint on changed authentication/workspace files passed.
 - `npm run build` passed, including the callback and invitation routes.
 - `npm run lint` passed with 0 errors and 30 warnings in existing application files (unused imports and `<img>` optimization warnings).
-- No live database or SMTP/provider credentials were available for integration tests.
-- Docker was installed but its local engine was not running, so the migration could not be exercised against local Postgres.
+- Browser verification against the locally configured Supabase project showed the active workspace, loaded brand profile, and preserved edited profile values after a page reload.
+- Docker was installed but its local engine was not running, so the migration was not separately exercised against local Postgres.
 
 ## Next steps
 
-1. Review the Phase 1 migration with a test Supabase project and confirm the backfill, RLS policies, invitation flow, and private storage behavior.
-2. Apply migrations in order and configure Supabase Auth redirect URLs and email delivery.
-3. Configure public Supabase variables and the server-only `SUPABASE_SERVICE_ROLE_KEY` only if workspace invitations are needed.
-4. Run live acceptance tests with separate organization and workspace accounts before updating production.
-5. Plan external social/AI integrations only after platform API access, approvals, pricing, and data-processing requirements are confirmed.
+1. Verify the Vercel deployment for commit `078abd6` and test the deployed domain's login/callback URLs.
+2. Test tenant isolation with a second account and verify file upload/download and Realtime.
+3. Configure `SUPABASE_SERVICE_ROLE_KEY` only if workspace invitations are needed.
+4. Plan external social/AI integrations only after platform API access, approvals, pricing, and data-processing requirements are confirmed.
 
 See [`docs/FEASIBILITY.md`](./docs/FEASIBILITY.md), [`docs/PLATFORM_API_MATRIX.md`](./docs/PLATFORM_API_MATRIX.md), [`docs/INFRASTRUCTURE_COMPARISON.md`](./docs/INFRASTRUCTURE_COMPARISON.md), and [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) for the architecture and research snapshot.
