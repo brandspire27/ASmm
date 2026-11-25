@@ -4,6 +4,7 @@ import React from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { useAppState } from "@/context/AppStateContext"
+import BrandLogo from "@/components/BrandLogo"
 import {
   LayoutDashboard,
   Users,
@@ -14,7 +15,6 @@ import {
   CheckSquare,
   BarChart3,
   LogOut,
-  Sparkles,
   ChevronDown,
   Building,
   Radio,
@@ -53,7 +53,7 @@ export default function Sidebar() {
       {/* Brand Header */}
       <div className="flex h-16 items-center px-6 gap-2.5 border-b border-border">
         <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
-          <Sparkles className="h-5 w-5" />
+          <BrandLogo className="h-7 w-auto max-w-full object-contain" />
         </div>
         <div>
           <h1 className="text-sm font-bold text-foreground tracking-tight">AgencyOS Lite</h1>

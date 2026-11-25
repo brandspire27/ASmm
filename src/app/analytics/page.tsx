@@ -3,7 +3,7 @@
 import React, { useState } from "react"
 import DashboardLayout from "@/components/DashboardLayout"
 import { useAppState } from "@/context/AppStateContext"
-import { BarChart3, Sparkles, Layers, DollarSign, MousePointerClick, Users, ArrowUpRight } from "lucide-react"
+import { BarChart3, Layers, DollarSign, MousePointerClick, Users, ArrowUpRight } from "lucide-react"
 
 export default function AnalyticsPage() {
   const { state, addCampaign } = useAppState()

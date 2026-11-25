@@ -3,7 +3,8 @@
 import React, { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useAppState } from "@/context/AppStateContext"
-import { Lock, Mail, ShieldAlert, Sparkles } from "lucide-react"
+import BrandLogo from "@/components/BrandLogo"
+import { Lock, Mail, ShieldAlert } from "lucide-react"
 
 export default function LoginPage() {
   const { state, login, isLoading: isCheckingSession, isConfigured, connectionError } = useAppState()
@@ -44,9 +45,7 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="w-full max-w-md space-y-6 rounded-lg border border-border bg-card p-8 shadow-xl">
         <div className="flex flex-col items-center text-center space-y-2">
-          <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/20 text-primary">
-            <Sparkles className="h-6 w-6" />
-          </div>
+          <BrandLogo className="h-16 w-auto" />
           <h1 className="text-2xl font-bold tracking-tight text-foreground">AgencyOS Lite</h1>
           <p className="text-sm text-muted-foreground">
             Internal AI Marketing Agency Operating System

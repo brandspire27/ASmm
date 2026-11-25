@@ -3,7 +3,8 @@
 import React, { useState } from "react"
 import DashboardLayout from "@/components/DashboardLayout"
 import { useAppState, GeneratedContent } from "@/context/AppStateContext"
-import { Video, Play, Sparkles, RefreshCw, Layers, CheckCircle, Sliders, Film } from "lucide-react"
+import BrandLogo from "@/components/BrandLogo"
+import { Video, Play, RefreshCw, Layers, CheckCircle, Sliders, Film } from "lucide-react"
 
 export default function VideosPage() {
   const { state, generateAIContent } = useAppState()
@@ -255,7 +256,7 @@ export default function VideosPage() {
                       </>
                     ) : (
                       <>
-                        <Sparkles className="h-3.5 w-3.5" />
+                        <BrandLogo className="h-3.5 w-auto" />
                         Create Demo Preview
                       </>
                     )}

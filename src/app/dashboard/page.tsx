@@ -3,12 +3,12 @@
 import Link from "next/link"
 import DashboardLayout from "@/components/DashboardLayout"
 import { useAppState } from "@/context/AppStateContext"
+import BrandLogo from "@/components/BrandLogo"
 import {
   TrendingUp,
   Users,
   Cpu,
   CheckSquare,
-  Sparkles,
   ArrowRight,
   PlusCircle,
   Video,
@@ -56,7 +56,7 @@ export default function Dashboard() {
               href="/generator"
               className="inline-flex items-center gap-1.5 rounded-md bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground hover:bg-primary/90 transition"
             >
-              <Sparkles className="h-3.5 w-3.5" />
+              <BrandLogo className="h-3.5 w-auto" />
               Generate Content
             </Link>
             <Link

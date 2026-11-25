@@ -3,7 +3,7 @@
 import React, { useState } from "react"
 import DashboardLayout from "@/components/DashboardLayout"
 import { useAppState } from "@/context/AppStateContext"
-import { Users, Plus, Trash, Globe, MapPin, Tag, Sparkles, Building2 } from "lucide-react"
+import { Users, Plus, Trash, Globe, MapPin, Tag, Building2 } from "lucide-react"
 
 export default function ClientsPage() {
   const { state, addClient, setActiveClient } = useAppState()
