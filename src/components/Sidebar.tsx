@@ -39,9 +39,13 @@ export default function Sidebar() {
 
   const activeClient = state.clients.find((c) => c.id === state.activeClientId)
 
-  const handleLogout = () => {
-    logout()
-    router.push("/login")
+  const handleLogout = async () => {
+    try {
+      await logout()
+      router.push("/login")
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : "Unable to sign out.")
+    }
   }
 
   return (
@@ -119,29 +123,29 @@ export default function Sidebar() {
         })}
       </nav>
 
-      {/* Real-time AI Router Status Badges */}
+      {/* Saved AI provider preferences */}
       <div className="p-4 border-t border-border bg-secondary/10 space-y-2">
         <div className="flex items-center justify-between text-[10px]">
           <span className="text-muted-foreground font-medium flex items-center gap-1">
-            <Radio className="h-3 w-3 text-emerald-500 animate-pulse" />
-            AI Router Chains
+            <Radio className="h-3 w-3 text-muted-foreground" />
+            Provider Preferences
           </span>
-          <span className="text-emerald-500 font-bold uppercase font-mono">Live</span>
+          <span className="text-muted-foreground font-bold uppercase font-mono">Saved</span>
         </div>
         <div className="grid grid-cols-3 gap-1 text-[9px] font-mono">
-          <div className="bg-card border border-border rounded p-1 text-center" title="Text AI Model">
+          <div className="bg-card border border-border rounded p-1 text-center" title="Selected text provider (not connected)">
             <div className="text-muted-foreground">TXT</div>
             <div className="font-semibold text-foreground truncate">
               {state.providers.text.active}
             </div>
           </div>
-          <div className="bg-card border border-border rounded p-1 text-center" title="Image Generation">
+          <div className="bg-card border border-border rounded p-1 text-center" title="Selected image provider (not connected)">
             <div className="text-muted-foreground">IMG</div>
             <div className="font-semibold text-foreground truncate">
               {state.providers.image.active}
             </div>
           </div>
-          <div className="bg-card border border-border rounded p-1 text-center" title="Video Rendering API">
+          <div className="bg-card border border-border rounded p-1 text-center" title="Selected video provider (not connected)">
             <div className="text-muted-foreground">VID</div>
             <div className="font-semibold text-foreground truncate">
               {state.providers.video.active}

@@ -17,29 +17,40 @@ export default function ClientsPage() {
   const [darkColor, setDarkColor] = useState("#000000")
   
   const [isAdding, setIsAdding] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
   const [notification, setNotification] = useState("")
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!name || !companyDescription || !targetAudience) {
       alert("Please fill in all details.")
       return
     }
 
-    const brandColors = [primaryColor, secondaryColor, darkColor]
-    const newClient = addClient(name, companyDescription, targetAudience, brandColors)
-    
-    // Reset form
-    setName("")
-    setCompanyDescription("")
-    setTargetAudience("")
-    setPrimaryColor("#4A90E2")
-    setSecondaryColor("#50E3C2")
-    setDarkColor("#000000")
-    setIsAdding(false)
-    
-    setNotification(`Successfully created client: ${newClient.name}!`)
-    setTimeout(() => setNotification(""), 4000)
+    setIsSaving(true)
+    try {
+      const newClient = await addClient(
+        name,
+        companyDescription,
+        targetAudience,
+        [primaryColor, secondaryColor, darkColor]
+      )
+
+      setName("")
+      setCompanyDescription("")
+      setTargetAudience("")
+      setPrimaryColor("#4A90E2")
+      setSecondaryColor("#50E3C2")
+      setDarkColor("#000000")
+      setIsAdding(false)
+
+      setNotification(`Successfully created client: ${newClient.name}!`)
+      setTimeout(() => setNotification(""), 4000)
+    } catch (error) {
+      setNotification(error instanceof Error ? error.message : "Unable to create the client.")
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   return (
@@ -176,7 +187,7 @@ export default function ClientsPage() {
                   type="submit"
                   className="rounded-md bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground hover:bg-primary/90 transition"
                 >
-                  Create Client & Load Workspace
+                  {isSaving ? "Saving Client..." : "Create Client & Load Workspace"}
                 </button>
               </div>
             </form>

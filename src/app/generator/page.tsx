@@ -46,7 +46,7 @@ export default function GeneratorPage() {
     ]
   }
 
-  const handleGenerate = (e: React.FormEvent) => {
+  const handleGenerate = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!activeClient) {
       alert("Please select a focused client from the sidebar first.")
@@ -58,40 +58,50 @@ export default function GeneratorPage() {
     }
 
     setIsGenerating(true)
-    
-    // Simulate API call and router delay
-    setTimeout(() => {
-      const result = generateAIContent(activeClient.id, generationType, prompt)
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 1200))
+      const result = await generateAIContent(activeClient.id, generationType, prompt)
       setLatestAsset(result)
-      setIsGenerating(false)
       setPrompt("")
-      setNotification(`Content successfully generated using active router provider: ${result.providerUsed}!`)
+      setNotification(`Demo output saved to the shared workspace. AI provider calls are not configured.`)
       setTimeout(() => setNotification(""), 4000)
-    }, 1200)
-  }
-
-  const handleApprove = () => {
-    if (latestAsset) {
-      updateContentStatus(latestAsset.id, "approved")
-      setNotification("Asset approved and sent to publishing manager!")
-      setLatestAsset((prev) => (prev ? { ...prev, status: "approved" } : null))
-      setTimeout(() => setNotification(""), 3000)
+    } catch (error) {
+      setNotification(error instanceof Error ? error.message : "Unable to save generated content.")
+    } finally {
+      setIsGenerating(false)
     }
   }
 
-  const handleRegenerate = () => {
+  const handleApprove = async () => {
     if (latestAsset) {
+      try {
+        await updateContentStatus(latestAsset.id, "approved")
+        setNotification("Asset approval saved to the shared workspace.")
+        setLatestAsset((prev) => (prev ? { ...prev, status: "approved" } : null))
+        setTimeout(() => setNotification(""), 3000)
+      } catch (error) {
+        setNotification(error instanceof Error ? error.message : "Unable to approve the asset.")
+      }
+    }
+  }
+
+  const handleRegenerate = async () => {
+    if (latestAsset && activeClient) {
       setIsGenerating(true)
       const oldType = latestAsset.type
       const oldPrompt = latestAsset.title.replace(`${oldType.toUpperCase()} - `, "").replace("...", "")
-      
-      setTimeout(() => {
-        const result = generateAIContent(activeClient!.id, oldType, oldPrompt + " (V2 Regenerated)")
+
+      try {
+        await new Promise((resolve) => setTimeout(resolve, 1000))
+        const result = await generateAIContent(activeClient.id, oldType, oldPrompt + " (V2 Regenerated)")
         setLatestAsset(result)
-        setIsGenerating(false)
-        setNotification(`Successfully regenerated asset using: ${result.providerUsed}`)
+        setNotification("Regenerated demo output saved to the shared workspace.")
         setTimeout(() => setNotification(""), 3000)
-      }, 1000)
+      } catch (error) {
+        setNotification(error instanceof Error ? error.message : "Unable to regenerate content.")
+      } finally {
+        setIsGenerating(false)
+      }
     }
   }
 
@@ -102,7 +112,7 @@ export default function GeneratorPage() {
         <div className="border-b border-border pb-5">
           <h2 className="text-xl font-bold text-foreground tracking-tight">AI Content & Thumbnail Generator</h2>
           <p className="text-xs text-muted-foreground">
-            Instantly write ad scripts, campaign strategies, organic captions, or render rich overlay thumbnails using active AI router networks.
+            Save template-based content drafts to the shared workspace. Live AI provider calls are not configured yet.
           </p>
         </div>
 
@@ -194,12 +204,12 @@ export default function GeneratorPage() {
                     {isGenerating ? (
                       <>
                         <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                        AI Router: Routing Failover Queues...
+                        Saving demo draft...
                       </>
                     ) : (
                       <>
                         <Sparkles className="h-3.5 w-3.5" />
-                        Generate with active router: {generationType === "thumbnail" ? state.providers.image.active : state.providers.text.active}
+                        Generate Demo Draft
                       </>
                     )}
                   </button>
@@ -209,7 +219,7 @@ export default function GeneratorPage() {
               {/* Connected Client Context Display Box */}
               <div className="rounded-lg border border-border bg-secondary/20 p-4 space-y-2">
                 <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                  AI Context Infused from Client Profile
+                  Client Profile Context
                 </div>
                 <div className="space-y-1">
                   <div className="text-xs font-bold text-foreground">

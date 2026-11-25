@@ -6,7 +6,7 @@ import { useAppState, BrandAsset } from "@/context/AppStateContext"
 import { Briefcase, UploadCloud, PlusCircle, Trash2, Image as ImageIcon, Link as LinkIcon, FileCheck } from "lucide-react"
 
 export default function AssetsPage() {
-  const { state, addBrandAsset, deleteBrandAsset } = useAppState()
+  const { state, addBrandAsset, uploadBrandAsset, deleteBrandAsset } = useAppState()
   
   const activeClient = state.clients.find((c) => c.id === state.activeClientId)
 
@@ -14,7 +14,9 @@ export default function AssetsPage() {
   const [assetName, setAssetName] = useState("")
   const [assetType, setAssetType] = useState<BrandAsset["type"]>("logo")
   const [assetUrl, setAssetUrl] = useState("")
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [isUploading, setIsUploading] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
   const [notification, setNotification] = useState("")
 
   // Suggested high quality sample imagery to make it easy to add assets!
@@ -25,28 +27,56 @@ export default function AssetsPage() {
     { name: "Brand Abstract Background", url: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&h=600&fit=crop&q=80" }
   ]
 
-  const handleSimulatedUpload = (e: React.FormEvent) => {
+  const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!activeClient) {
       alert("Please focus on a client first.")
       return
     }
-    if (!assetName || !assetUrl) {
-      alert("Please fill in asset details.")
+    if (!assetName || (!selectedFile && !assetUrl)) {
+      setNotification("Add an asset name and either select a file or enter a URL.")
+      return
+    }
+    if (selectedFile && selectedFile.size > 50 * 1024 * 1024) {
+      setNotification("Files must be 50 MB or smaller.")
       return
     }
 
-    addBrandAsset(activeClient.id, assetName, assetType, assetUrl)
-    setAssetName("")
-    setAssetUrl("")
-    setIsUploading(false)
-    setNotification("Brand asset uploaded and simulated to Cloudflare R2 successfully!")
-    setTimeout(() => setNotification(""), 4000)
+    setIsSaving(true)
+    try {
+      if (selectedFile) {
+        await uploadBrandAsset(activeClient.id, assetName, assetType, selectedFile)
+        setNotification("File uploaded to the agency's private cloud storage.")
+      } else {
+        await addBrandAsset(activeClient.id, assetName, assetType, assetUrl)
+        setNotification("External asset link saved to the shared workspace.")
+      }
+      setAssetName("")
+      setAssetUrl("")
+      setSelectedFile(null)
+      setIsUploading(false)
+      setTimeout(() => setNotification(""), 4000)
+    } catch (error) {
+      setNotification(error instanceof Error ? error.message : "Unable to save the brand asset.")
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   const handleUseSample = (sample: typeof SAMPLE_IMAGES[0]) => {
     setAssetName(sample.name)
     setAssetUrl(sample.url)
+    setSelectedFile(null)
+  }
+
+  const handleDelete = async (clientId: string, assetId: string) => {
+    try {
+      await deleteBrandAsset(clientId, assetId)
+      setNotification("Asset removed from the shared workspace.")
+      setTimeout(() => setNotification(""), 3500)
+    } catch (error) {
+      setNotification(error instanceof Error ? error.message : "Unable to delete the asset.")
+    }
   }
 
   return (
@@ -57,7 +87,7 @@ export default function AssetsPage() {
           <div>
             <h2 className="text-xl font-bold text-foreground tracking-tight">Brand Asset Management</h2>
             <p className="text-xs text-muted-foreground">
-              Securely store logos, high-res products, palettes, and media resources simulated inside Cloudflare R2 bucket.
+              Store client assets in the agency&apos;s private Supabase Storage bucket.
             </p>
           </div>
 
@@ -67,7 +97,7 @@ export default function AssetsPage() {
               className="inline-flex items-center gap-1.5 rounded-md bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground hover:bg-primary/90 transition"
             >
               <UploadCloud className="h-4 w-4" />
-              {isUploading ? "Cancel Asset Upload" : "Simulate R2 Upload"}
+              {isUploading ? "Cancel Asset Upload" : "Add Brand Asset"}
             </button>
           )}
         </div>
@@ -94,10 +124,10 @@ export default function AssetsPage() {
               <div className="rounded-lg border border-border bg-card p-6 space-y-4">
                 <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
                   <UploadCloud className="h-4 w-4 text-primary" />
-                  Upload Brand Assets (Cloudflare R2 Bucket Simulator)
+                  Upload Brand Assets to Private Cloud Storage
                 </h3>
 
-                <form onSubmit={handleSimulatedUpload} className="space-y-4">
+                <form onSubmit={handleUpload} className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
@@ -132,7 +162,22 @@ export default function AssetsPage() {
 
                   <div className="space-y-1">
                     <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                      Asset Remote Resource URL
+                      Upload a file (up to 50 MB)
+                    </label>
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,application/pdf"
+                      onChange={(e) => setSelectedFile(e.target.files?.[0] ?? null)}
+                      className="w-full rounded-md border border-border bg-secondary/30 py-2 px-3 text-xs text-foreground"
+                    />
+                    {selectedFile && (
+                      <p className="text-[10px] text-muted-foreground">{selectedFile.name}</p>
+                    )}
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                      Or save an external asset URL
                     </label>
                     <div className="relative">
                       <LinkIcon className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
@@ -142,7 +187,6 @@ export default function AssetsPage() {
                         onChange={(e) => setAssetUrl(e.target.value)}
                         placeholder="https://images.unsplash.com/..."
                         className="w-full rounded-md border border-border bg-secondary/30 py-2 pl-10 pr-3 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
-                        required
                       />
                     </div>
                   </div>
@@ -174,9 +218,10 @@ export default function AssetsPage() {
                   <div className="flex justify-end pt-2">
                     <button
                       type="submit"
-                      className="rounded-md bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground hover:bg-primary/90 transition"
+                      disabled={isSaving}
+                      className="rounded-md bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground hover:bg-primary/90 transition disabled:opacity-50"
                     >
-                      Process Simulated R2 Upload
+                      {isSaving ? "Saving to cloud..." : "Save Brand Asset"}
                     </button>
                   </div>
                 </form>
@@ -257,7 +302,7 @@ export default function AssetsPage() {
                         </a>
 
                         <button
-                          onClick={() => deleteBrandAsset(activeClient.id, asset.id)}
+                          onClick={() => handleDelete(activeClient.id, asset.id)}
                           className="text-muted-foreground hover:text-destructive p-1 rounded hover:bg-destructive/10 transition-colors"
                           title="Delete brand asset"
                         >
@@ -271,7 +316,7 @@ export default function AssetsPage() {
 
               {activeClient.assets.length === 0 && (
                 <div className="rounded-lg border border-dashed border-border py-12 text-center text-muted-foreground text-xs italic">
-                  No brand assets (logos or product shots) loaded for {activeClient.name} yet. Click &quot;Simulate R2 Upload&quot; above to quickly load assets.
+                  No brand assets (logos or product shots) loaded for {activeClient.name} yet. Add a file or save an external URL.
                 </div>
               )}
             </div>

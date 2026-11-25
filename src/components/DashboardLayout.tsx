@@ -7,16 +7,16 @@ import Sidebar from "./Sidebar"
 import { ShieldCheck, Calendar, Bell, Sliders } from "lucide-react"
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const { state } = useAppState()
+  const { state, isLoading, connectionError, isConfigured } = useAppState()
   const router = useRouter()
 
   useEffect(() => {
-    if (!state.currentUser) {
+    if (!isLoading && !state.currentUser) {
       router.push("/login")
     }
-  }, [state.currentUser, router])
+  }, [state.currentUser, isLoading, router])
 
-  if (!state.currentUser) {
+  if (isLoading || !state.currentUser) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="text-center space-y-2 animate-pulse">
@@ -73,15 +73,22 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
             <div className="h-4 w-[1px] bg-border" />
 
-            <div className="flex items-center gap-1.5 text-xs text-emerald-500 bg-emerald-500/10 px-2 py-1 rounded font-mono font-semibold">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-ping" />
-              System OK
+            <div className={`flex items-center gap-1.5 text-xs px-2 py-1 rounded font-mono font-semibold ${
+              connectionError ? "text-destructive bg-destructive/10" : "text-emerald-500 bg-emerald-500/10"
+            }`}>
+              <span className={`h-1.5 w-1.5 rounded-full ${connectionError ? "bg-destructive" : "bg-emerald-500 animate-ping"}`} />
+              {connectionError ? "Cloud Error" : isConfigured ? "Cloud Connected" : "Offline"}
             </div>
           </div>
         </header>
 
         {/* Content Children */}
         <main className="flex-1 overflow-y-auto p-8">
+          {connectionError && (
+            <div role="alert" className="mb-6 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+              Cloud workspace error: {connectionError}
+            </div>
+          )}
           {children}
         </main>
       </div>

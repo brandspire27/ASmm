@@ -69,32 +69,36 @@ export default function VideosPage() {
 
     setIsRendering(true)
     setRenderProgress(10)
-    setRenderLogs(["Connecting to active rendering API: " + state.providers.video.active])
+    setRenderLogs(["Preparing a template demo preview. No video-rendering service is connected."])
 
     const steps = [
-      { progress: 25, log: "Authenticated API access token. Parsing media assets..." },
-      { progress: 45, log: `Injecting variables - Headline: "${headline}", Color: "${accentColor || "#FF4500"}"` },
-      { progress: 65, log: "Overriding video layers & adjusting timeline keyframes..." },
-      { progress: 85, log: "Rendering video frames. Compiling MP4 file format in cloud containers..." },
-      { progress: 100, log: "Rendering completed successfully! Video file generated." }
+      { progress: 25, log: "Loading the selected demo template..." },
+      { progress: 45, log: `Applying preview text and color: "${headline}", "${accentColor || "#FF4500"}"` },
+      { progress: 65, log: "Preparing preview overlays..." },
+      { progress: 85, log: "Saving preview details to the shared workspace..." },
+      { progress: 100, log: "Demo preview ready. No MP4 was rendered." }
     ]
 
     steps.forEach((step, idx) => {
-      setTimeout(() => {
+      setTimeout(async () => {
         setRenderProgress(step.progress)
         setRenderLogs((prev) => [...prev, step.log])
         
         if (step.progress === 100) {
-          // Commit video back to global state
-          const videoAsset = generateAIContent(activeClient.id, "video", `${template} - ${headline}`, {
-            template,
-            textVariables: [headline, subHeadline],
-            colorHex: accentColor || "#FF4500"
-          })
-          setCompletedVideo(videoAsset)
-          setIsRendering(false)
-          setNotification(`Successfully rendered template video using Cloud Engine: ${state.providers.video.active}!`)
-          setTimeout(() => setNotification(""), 4000)
+          try {
+            const videoAsset = await generateAIContent(activeClient.id, "video", `${template} - ${headline}`, {
+              template,
+              textVariables: [headline, subHeadline],
+              colorHex: accentColor || "#FF4500"
+            })
+            setCompletedVideo(videoAsset)
+            setNotification("Demo preview details saved. Connect a rendering provider to create an MP4.")
+            setTimeout(() => setNotification(""), 4000)
+          } catch (error) {
+            setNotification(error instanceof Error ? error.message : "Unable to save the demo preview.")
+          } finally {
+            setIsRendering(false)
+          }
         }
       }, (idx + 1) * 900)
     })
@@ -105,9 +109,9 @@ export default function VideosPage() {
       <div className="space-y-8">
         {/* Header Section */}
         <div className="border-b border-border pb-5">
-          <h2 className="text-xl font-bold text-foreground tracking-tight">AI Video Template Generator</h2>
+          <h2 className="text-xl font-bold text-foreground tracking-tight">Video Template Preview</h2>
           <p className="text-xs text-muted-foreground">
-            Customize video variables and render dynamic template-based MP4 promos using automated cloud rendering networks.
+            Preview template variables. Cloud video rendering and MP4 export are not connected.
           </p>
         </div>
 
@@ -247,12 +251,12 @@ export default function VideosPage() {
                     {isRendering ? (
                       <>
                         <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                        Rendering frames: {renderProgress}%
+                        Preparing preview: {renderProgress}%
                       </>
                     ) : (
                       <>
                         <Sparkles className="h-3.5 w-3.5" />
-                        Render MP4 using {state.providers.video.active}
+                        Create Demo Preview
                       </>
                     )}
                   </button>
@@ -268,13 +272,13 @@ export default function VideosPage() {
                 <div className="rounded-lg border border-border bg-card p-6 space-y-4">
                   <h3 className="text-xs font-bold text-foreground uppercase tracking-wider border-b border-border pb-2 flex items-center gap-1.5">
                     <RefreshCw className="h-4 w-4 text-primary animate-spin" />
-                    Cloud Video Rendering Queue
+                    Demo Preview Preparation
                   </h3>
 
                   {/* Progress Bar */}
                   <div className="space-y-2">
                     <div className="flex justify-between text-xs">
-                      <span className="text-muted-foreground font-semibold">Engine status: Rendering timeline</span>
+                      <span className="text-muted-foreground font-semibold">                      Preparing demo preview</span>
                       <span className="font-bold font-mono text-primary">{renderProgress}%</span>
                     </div>
                     <div className="w-full bg-secondary h-2.5 rounded overflow-hidden">
@@ -312,13 +316,13 @@ export default function VideosPage() {
                       </h4>
                     </div>
                     <span className="text-[10px] text-emerald-500 font-mono font-bold uppercase bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
-                      Completed MP4
+                      Demo Preview
                     </span>
                   </div>
 
                   {/* Visual Screen */}
                   <div className="aspect-video relative bg-black flex items-center justify-center overflow-hidden">
-                    {/* Simulated High fidelity video player loop */}
+                    {/* Demo preview background */}
                     <video
                       src={completedVideo.meta?.videoUrl}
                       controls
@@ -349,7 +353,7 @@ export default function VideosPage() {
                         {completedVideo.title}
                       </div>
                       <div className="text-[10px] text-muted-foreground font-mono">
-                        Template: {completedVideo.meta?.template} | Provider: {completedVideo.providerUsed}
+                        Template: {completedVideo.meta?.template} | {completedVideo.providerUsed}
                       </div>
                     </div>
 
@@ -366,7 +370,7 @@ export default function VideosPage() {
                     <Layers className="h-10 w-10 text-muted-foreground animate-pulse" />
                     <h3 className="text-sm font-semibold text-foreground">Video Preview Screen</h3>
                     <p className="max-w-md mx-auto text-xs leading-relaxed">
-                      Select a visual video template style on the left, write your custom text variables, and click &quot;Render MP4&quot; to compile the cloud video assets timeline.
+                      Select a template and enter text to save a demo preview. This does not render or export an MP4.
                     </p>
                   </div>
                 )

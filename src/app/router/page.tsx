@@ -9,35 +9,34 @@ export default function RouterPage() {
   const { state, triggerFailover, resetProviderLimits, toggleProviderLimit } = useAppState()
   const [notification, setNotification] = useState("")
 
-  const handleManualFailover = (type: "text" | "image" | "video") => {
-    const nextActive = triggerFailover(type)
-    setNotification(`Manual failover triggered for ${type.toUpperCase()}! Active model is now: ${nextActive}`)
+  const handleManualFailover = async (type: "text" | "image" | "video") => {
+    try {
+      const nextActive = await triggerFailover(type)
+      setNotification(`Manual failover setting saved for ${type.toUpperCase()}: ${nextActive}`)
+    } catch (error) {
+      setNotification(error instanceof Error ? error.message : "Unable to update provider settings.")
+    }
     setTimeout(() => setNotification(""), 4000)
   }
 
-  const handleResetLimits = (type: "text" | "image" | "video") => {
-    resetProviderLimits(type)
-    setNotification(`Successfully reset all limits for ${type.toUpperCase()} routing sequence.`)
+  const handleResetLimits = async (type: "text" | "image" | "video") => {
+    try {
+      await resetProviderLimits(type)
+      setNotification(`Provider settings saved for ${type.toUpperCase()}.`)
+    } catch (error) {
+      setNotification(error instanceof Error ? error.message : "Unable to reset provider settings.")
+    }
     setTimeout(() => setNotification(""), 4000)
   }
 
-  const handleLimitToggle = (type: "text" | "image" | "video", provider: string, reached: boolean) => {
-    toggleProviderLimit(type, provider, reached)
-    setNotification(`Toggled limits for ${provider} to: ${reached ? "BLOCKED (Limit Hit)" : "HEALTHY"}`)
+  const handleLimitToggle = async (type: "text" | "image" | "video", provider: string, reached: boolean) => {
+    try {
+      await toggleProviderLimit(type, provider, reached)
+      setNotification(`Provider setting saved for ${provider}.`)
+    } catch (error) {
+      setNotification(error instanceof Error ? error.message : "Unable to update provider settings.")
+    }
     setTimeout(() => setNotification(""), 4000)
-  }
-
-  // Provider static parameters to display beautiful mock stats (cost, latency, uptime)
-  const providerStats: Record<string, { cost: string; latency: string; details: string }> = {
-    Gemini: { cost: "$0.00015 / 1k tokens", latency: "1.2s", details: "Google flagship multimodal text generation API" },
-    Groq: { cost: "$0.00050 / 1k tokens", latency: "0.2s", details: "Llama 3 ultra-fast inference host" },
-    OpenRouter: { cost: "$0.00180 / 1k tokens", latency: "1.8s", details: "Intelligent gateway aggregator failover" },
-    "Cloudflare AI": { cost: "$0.00005 / 1k tokens", latency: "0.8s", details: "Workers AI serverless edge inference" },
-    Clipdrop: { cost: "$0.015 / image", latency: "2.4s", details: "High-fidelity Jasper/SDXL photo-realistic images" },
-    Pixian: { cost: "$0.008 / image", latency: "1.1s", details: "Fast stable background remover & canvas gen" },
-    Creatomate: { cost: "$0.10 / video render", latency: "15s", details: "Dynamic template video engine with HTML5 preview" },
-    Shotstack: { cost: "$0.08 / video render", latency: "22s", details: "Pro scale cloud video editing API container" },
-    JSON2Video: { cost: "$0.05 / video render", latency: "18s", details: "JSON script to mp4 file generator" }
   }
 
   return (
@@ -45,9 +44,9 @@ export default function RouterPage() {
       <div className="space-y-8">
         {/* Page Title */}
         <div>
-          <h2 className="text-xl font-bold text-foreground tracking-tight">AI Router & Failover Engine</h2>
+          <h2 className="text-xl font-bold text-foreground tracking-tight">Provider Configuration</h2>
           <p className="text-xs text-muted-foreground">
-            Monitor and configure your active automated provider failover chains for text generation, thumbnail layout, and video render calls.
+            Save shared provider preferences. Provider APIs and automatic failover are not connected.
           </p>
         </div>
 
@@ -68,7 +67,7 @@ export default function RouterPage() {
                   Text Generation Route
                 </h3>
                 <span className="text-[10px] bg-primary/20 text-primary px-2 py-0.5 rounded-full font-bold">
-                  Active: {state.providers.text.active}
+                  Selected: {state.providers.text.active}
                 </span>
               </div>
               <p className="text-xs text-muted-foreground">
@@ -85,7 +84,6 @@ export default function RouterPage() {
                 {state.providers.text.sequence.map((prov, index) => {
                   const isActive = state.providers.text.active === prov
                   const isBlocked = state.providers.text.limitsReached[prov]
-                  const stats = providerStats[prov]
 
                   return (
                     <div
@@ -108,7 +106,7 @@ export default function RouterPage() {
                           )}
                         </div>
                         <p className="text-[9px] text-muted-foreground line-clamp-1">
-                          {stats?.details}
+                          Provider API not connected
                         </p>
                       </div>
 
@@ -138,7 +136,7 @@ export default function RouterPage() {
                 onClick={() => handleManualFailover("text")}
                 className="flex-1 rounded bg-secondary text-foreground hover:bg-secondary/80 border border-border py-1.5 text-xs font-semibold flex items-center justify-center gap-1.5 transition"
               >
-                Force Failover
+                Rotate Selection
               </button>
               <button
                 onClick={() => handleResetLimits("text")}
@@ -158,7 +156,7 @@ export default function RouterPage() {
                   Image / Thumbnail Route
                 </h3>
                 <span className="text-[10px] bg-primary/20 text-primary px-2 py-0.5 rounded-full font-bold">
-                  Active: {state.providers.image.active}
+                  Selected: {state.providers.image.active}
                 </span>
               </div>
               <p className="text-xs text-muted-foreground">
@@ -175,7 +173,6 @@ export default function RouterPage() {
                 {state.providers.image.sequence.map((prov, index) => {
                   const isActive = state.providers.image.active === prov
                   const isBlocked = state.providers.image.limitsReached[prov]
-                  const stats = providerStats[prov]
 
                   return (
                     <div
@@ -198,7 +195,7 @@ export default function RouterPage() {
                           )}
                         </div>
                         <p className="text-[9px] text-muted-foreground line-clamp-1">
-                          {stats?.details}
+                          Provider API not connected
                         </p>
                       </div>
 
@@ -228,7 +225,7 @@ export default function RouterPage() {
                 onClick={() => handleManualFailover("image")}
                 className="flex-1 rounded bg-secondary text-foreground hover:bg-secondary/80 border border-border py-1.5 text-xs font-semibold flex items-center justify-center gap-1.5 transition"
               >
-                Force Failover
+                Rotate Selection
               </button>
               <button
                 onClick={() => handleResetLimits("image")}
@@ -248,7 +245,7 @@ export default function RouterPage() {
                   Video Rendering Chain
                 </h3>
                 <span className="text-[10px] bg-primary/20 text-primary px-2 py-0.5 rounded-full font-bold">
-                  Active: {state.providers.video.active}
+                  Selected: {state.providers.video.active}
                 </span>
               </div>
               <p className="text-xs text-muted-foreground">
@@ -265,7 +262,6 @@ export default function RouterPage() {
                 {state.providers.video.sequence.map((prov, index) => {
                   const isActive = state.providers.video.active === prov
                   const isBlocked = state.providers.video.limitsReached[prov]
-                  const stats = providerStats[prov]
 
                   return (
                     <div
@@ -288,7 +284,7 @@ export default function RouterPage() {
                           )}
                         </div>
                         <p className="text-[9px] text-muted-foreground line-clamp-1">
-                          {stats?.details}
+                          Provider API not connected
                         </p>
                       </div>
 
@@ -318,7 +314,7 @@ export default function RouterPage() {
                 onClick={() => handleManualFailover("video")}
                 className="flex-1 rounded bg-secondary text-foreground hover:bg-secondary/80 border border-border py-1.5 text-xs font-semibold flex items-center justify-center gap-1.5 transition"
               >
-                Force Failover
+                Rotate Selection
               </button>
               <button
                 onClick={() => handleResetLimits("video")}
@@ -332,28 +328,8 @@ export default function RouterPage() {
 
         </div>
 
-        {/* Informational Diagnostics Block */}
-        <div className="rounded-lg border border-border bg-card p-6 space-y-4">
-          <h3 className="text-xs font-bold text-foreground uppercase tracking-wider border-b border-border pb-2">
-            Internal AI Router Technical Specifications & Costs
-          </h3>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {Object.entries(providerStats).map(([name, stats]) => (
-              <div key={name} className="p-4 rounded-md border border-border bg-secondary/10 flex flex-col justify-between space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-foreground">{name}</span>
-                  <span className="text-[10px] text-emerald-500 font-mono font-semibold">{stats.latency} latency</span>
-                </div>
-                <p className="text-[11px] text-muted-foreground leading-relaxed">
-                  {stats.details}
-                </p>
-                <div className="text-[10px] font-mono text-muted-foreground bg-card px-2 py-1 rounded border border-border text-center">
-                  Cost: <span className="text-primary font-bold">{stats.cost}</span>
-                </div>
-              </div>
-            ))}
-          </div>
+        <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-xs text-amber-700">
+          Provider selections and limit flags are saved configuration only. API credentials, health checks, usage costs, and automatic failover are not connected.
         </div>
 
       </div>

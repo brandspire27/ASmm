@@ -3,11 +3,10 @@
 import React, { useState } from "react"
 import DashboardLayout from "@/components/DashboardLayout"
 import { useAppState } from "@/context/AppStateContext"
-import { BarChart3, TrendingUp, Sparkles, RefreshCw, Layers, DollarSign, MousePointerClick, Users, ArrowUpRight } from "lucide-react"
+import { BarChart3, Sparkles, Layers, DollarSign, MousePointerClick, Users, ArrowUpRight } from "lucide-react"
 
 export default function AnalyticsPage() {
-  const { state, simulateCampaignStats, addCampaign } = useAppState()
-  const [isSimulating, setIsSimulating] = useState(false)
+  const { state, addCampaign } = useAppState()
   const [notification, setNotification] = useState("")
 
   // Local state for campaign creator
@@ -26,18 +25,7 @@ export default function AnalyticsPage() {
   const avgCtr = totalImpressions > 0 ? ((totalClicks / totalImpressions) * 100).toFixed(2) : "0.00"
   const avgConversionRate = totalClicks > 0 ? ((totalConversions / totalClicks) * 100).toFixed(2) : "0.00"
 
-  const triggerLiveMetricsTick = () => {
-    setIsSimulating(true)
-    simulateCampaignStats()
-    setNotification("Successfully simulated dynamic digital marketing performance increases across all campaigns!")
-    
-    setTimeout(() => {
-      setIsSimulating(false)
-      setTimeout(() => setNotification(""), 3500)
-    }, 800)
-  }
-
-  const handleCreateCampaign = (e: React.FormEvent) => {
+  const handleCreateCampaign = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!state.activeClientId) {
       alert("Please select a focused client in the sidebar first.")
@@ -48,19 +36,22 @@ export default function AnalyticsPage() {
       return
     }
 
-    addCampaign({
-      clientId: state.activeClientId,
-      campaignName: campName,
-      impressions: campImpressions,
-      clicks: campClicks,
-      conversions: campConversions,
-      spend: campSpend,
-      status: "active"
-    })
-
-    setCampName("")
-    setNotification(`Successfully registered new marketing campaign: ${campName}!`)
-    setTimeout(() => setNotification(""), 4000)
+    try {
+      await addCampaign({
+        clientId: state.activeClientId,
+        campaignName: campName,
+        impressions: campImpressions,
+        clicks: campClicks,
+        conversions: campConversions,
+        spend: campSpend,
+        status: "active"
+      })
+      setCampName("")
+      setNotification(`Saved campaign metrics for ${campName} to the shared workspace.`)
+      setTimeout(() => setNotification(""), 4000)
+    } catch (error) {
+      setNotification(error instanceof Error ? error.message : "Unable to save campaign metrics.")
+    }
   }
 
   return (
@@ -71,22 +62,9 @@ export default function AnalyticsPage() {
           <div>
             <h2 className="text-xl font-bold text-foreground tracking-tight">Performance Analytics</h2>
             <p className="text-xs text-muted-foreground">
-              Monitor real-time campaign spend, click engagement, conversions, and dynamic funnel metrics.
+            Review shared campaign metrics entered by your team. Social platform syncing is not configured.
             </p>
           </div>
-
-          <button
-            onClick={triggerLiveMetricsTick}
-            disabled={isSimulating}
-            className="inline-flex items-center gap-1.5 rounded-md bg-primary px-4 py-2 text-xs font-bold text-primary-foreground hover:bg-primary/90 transition disabled:opacity-40"
-          >
-            {isSimulating ? (
-              <RefreshCw className="h-4 w-4 animate-spin" />
-            ) : (
-              <TrendingUp className="h-4 w-4" />
-            )}
-            Simulate Traffic Increase
-          </button>
         </div>
 
         {notification && (

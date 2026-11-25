@@ -6,7 +6,7 @@ import { useAppState } from "@/context/AppStateContext"
 import { Lock, Mail, ShieldAlert, Sparkles } from "lucide-react"
 
 export default function LoginPage() {
-  const { state, login } = useAppState()
+  const { state, login, isLoading: isCheckingSession, isConfigured, connectionError } = useAppState()
   const router = useRouter()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -14,31 +14,30 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
 
   useEffect(() => {
-    if (state.currentUser) {
+    if (!isCheckingSession && state.currentUser) {
       router.push("/dashboard")
     }
-  }, [state.currentUser, router])
+  }, [state.currentUser, isCheckingSession, router])
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError("")
     setIsLoading(true)
 
-    // Ensure we have some inputs
     if (!email || !password) {
       setError("Please fill out all credentials.")
       setIsLoading(false)
       return
     }
 
-    // Direct access for internal usage with automatic password bypass for ease of use
-    const success = login(email)
-    if (success) {
+    try {
+      await login(email, password)
       router.push("/dashboard")
-    } else {
-      setError("Invalid agency credentials.")
+    } catch (loginError) {
+      setError(loginError instanceof Error ? loginError.message : "Unable to sign in.")
+    } finally {
+      setIsLoading(false)
     }
-    setIsLoading(false)
   }
 
   return (
@@ -55,6 +54,16 @@ export default function LoginPage() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {!isConfigured && (
+            <div className="rounded-md bg-amber-500/15 p-3 text-sm text-amber-700 border border-amber-500/30">
+              Supabase is not configured. Add the project URL and publishable key to the deployment environment.
+            </div>
+          )}
+          {connectionError && (
+            <div className="rounded-md bg-destructive/15 p-3 text-sm text-destructive border border-destructive/20">
+              {connectionError}
+            </div>
+          )}
           {error && (
             <div className="flex items-center gap-2 rounded-md bg-destructive/15 p-3 text-sm text-destructive border border-destructive/20">
               <ShieldAlert className="h-4 w-4" />
@@ -98,16 +107,16 @@ export default function LoginPage() {
 
           <button
             type="submit"
-            disabled={isLoading}
+            disabled={isLoading || isCheckingSession || !isConfigured}
             className="w-full rounded-md bg-primary py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition disabled:opacity-50"
           >
-            {isLoading ? "Authenticating..." : "Enter OS Workspace"}
+            {isLoading ? "Signing in..." : "Sign in"}
           </button>
         </form>
 
         <div className="border-t border-border pt-4 text-center">
           <p className="text-xs text-muted-foreground font-mono">
-            Mode: Production Internal (Bypass On)
+            Use the account created for you by your agency admin.
           </p>
         </div>
       </div>

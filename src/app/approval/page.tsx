@@ -3,45 +3,51 @@
 import React, { useState } from "react"
 import DashboardLayout from "@/components/DashboardLayout"
 import { useAppState } from "@/context/AppStateContext"
-import { CheckSquare, CheckCircle, Send, Trash2, Eye, ExternalLink, HelpCircle, RefreshCw, Smartphone } from "lucide-react"
+import { CheckSquare, CheckCircle, Send, RefreshCw } from "lucide-react"
 
 export default function ApprovalPage() {
   const { state, updateContentStatus } = useAppState()
   
-  const [selectedChannel, setSelectedChannel] = useState("LinkedIn")
   const [publishingAssetId, setPublishingAssetId] = useState<string | null>(null)
   const [notification, setNotification] = useState("")
-
-  const activeClient = state.clients.find((c) => c.id === state.activeClientId)
 
   // Filter content
   const draftContent = state.contentList.filter((c) => c.status === "draft")
   const approvedContent = state.contentList.filter((c) => c.status === "approved")
   const publishedContent = state.contentList.filter((c) => c.status === "published")
 
-  const handleApprove = (id: string) => {
-    updateContentStatus(id, "approved")
-    setNotification("Asset approved successfully! Move to Publishing panel below.")
-    setTimeout(() => setNotification(""), 3500)
+  const handleApprove = async (id: string) => {
+    try {
+      await updateContentStatus(id, "approved")
+      setNotification("Approval saved to the shared workspace.")
+      setTimeout(() => setNotification(""), 3500)
+    } catch (error) {
+      setNotification(error instanceof Error ? error.message : "Unable to approve the asset.")
+    }
   }
 
-  const handleReject = (id: string) => {
-    updateContentStatus(id, "rejected")
-    setNotification("Asset moved to archived/rejected database.")
-    setTimeout(() => setNotification(""), 3500)
+  const handleReject = async (id: string) => {
+    try {
+      await updateContentStatus(id, "rejected")
+      setNotification("Asset archived in the shared workspace.")
+      setTimeout(() => setNotification(""), 3500)
+    } catch (error) {
+      setNotification(error instanceof Error ? error.message : "Unable to archive the asset.")
+    }
   }
 
-  const handlePublish = (id: string) => {
+  const handlePublish = async (id: string) => {
     setPublishingAssetId(id)
-    setNotification(`Publishing asset to ${selectedChannel}... Overriding limits...`)
-
-    // Simulate multi-channel API dispatch
-    setTimeout(() => {
-      updateContentStatus(id, "published")
+    try {
+      await updateContentStatus(id, "published")
       setPublishingAssetId(null)
-      setNotification(`Successfully posted asset to ${selectedChannel}! Status logged as Published.`)
+      setNotification("Status marked as published. No social network post was sent.")
       setTimeout(() => setNotification(""), 4000)
-    }, 1500)
+    } catch (error) {
+      setNotification(error instanceof Error ? error.message : "Unable to update the asset status.")
+    } finally {
+      setPublishingAssetId(null)
+    }
   }
 
   return (
@@ -51,7 +57,7 @@ export default function ApprovalPage() {
         <div className="border-b border-border pb-5">
           <h2 className="text-xl font-bold text-foreground tracking-tight">Approvals & Publishing Hub</h2>
           <p className="text-xs text-muted-foreground">
-            Review your generated text copy, graphic thumbnails, and template MP4 videos. Approve them on the spot, or instantly publish to social networks.
+            Review and approve shared drafts. Social network publishing is not connected.
           </p>
         </div>
 
@@ -141,34 +147,8 @@ export default function ApprovalPage() {
         <div className="space-y-4">
           <h3 className="text-xs font-bold text-foreground uppercase tracking-wider flex items-center gap-1.5 border-b border-border pb-2">
             <Send className="h-4 w-4 text-primary" />
-            2. Social API Publishing Queue ({approvedContent.length} Assets Approved)
+            2. Approved Content Status Queue ({approvedContent.length} Assets Approved)
           </h3>
-
-          {/* Social Channels Selector */}
-          {approvedContent.length > 0 && (
-            <div className="rounded-lg border border-border bg-secondary/15 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div className="space-y-0.5">
-                <span className="text-xs font-bold text-foreground">Target Posting Destination:</span>
-                <p className="text-[11px] text-muted-foreground">Select where to dispatch content API requests</p>
-              </div>
-
-              <div className="flex flex-wrap gap-2">
-                {["LinkedIn", "Twitter/X", "Facebook", "Instagram"].map((channel) => (
-                  <button
-                    key={channel}
-                    onClick={() => setSelectedChannel(channel)}
-                    className={`px-3 py-1.5 rounded-md text-xs font-semibold transition ${
-                      selectedChannel === channel
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-card border border-border text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    {channel}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {approvedContent.map((item) => (
@@ -199,12 +179,12 @@ export default function ApprovalPage() {
                     {publishingAssetId === item.id ? (
                       <>
                         <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                        Executing Posting API Request...
+                        Updating status...
                       </>
                     ) : (
                       <>
                         <Send className="h-3.5 w-3.5" />
-                        Dispatch to {selectedChannel}
+                        Mark as Published
                       </>
                     )}
                   </button>

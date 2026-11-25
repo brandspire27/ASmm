@@ -1,6 +1,5 @@
 "use client"
 
-import React, { useEffect } from "react"
 import Link from "next/link"
 import DashboardLayout from "@/components/DashboardLayout"
 import { useAppState } from "@/context/AppStateContext"
@@ -19,12 +18,7 @@ import {
 } from "lucide-react"
 
 export default function Dashboard() {
-  const { state, simulateCampaignStats } = useAppState()
-
-  // Every time the dashboard is loaded, simulate a slight progress/increase in stats to show a living production workspace!
-  useEffect(() => {
-    simulateCampaignStats()
-  }, [])
+  const { state } = useAppState()
 
   // Calculate high-level stats
   const totalClients = state.clients.length
