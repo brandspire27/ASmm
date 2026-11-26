@@ -16,6 +16,7 @@ BrandSpire Social AI is a Next.js application for managing agency workspaces, cl
 3. Apply the migrations in order from **Supabase → SQL Editor**:
    - [`supabase/migrations/20261125162000_initial_workspace.sql`](./supabase/migrations/20261125162000_initial_workspace.sql)
    - [`supabase/migrations/20261125180000_phase1_organization_workspace_foundation.sql`](./supabase/migrations/20261125180000_phase1_organization_workspace_foundation.sql)
+   - [`supabase/migrations/20261126074000_phase1a_content_review_security.sql`](./supabase/migrations/20261126074000_phase1a_content_review_security.sql)
 4. Configure Supabase Auth:
    - Set the site URL to your local or production app URL.
    - Add `http://localhost:3000/auth/callback` and your production `/auth/callback` URL to the allowed redirect URLs.
@@ -41,3 +42,7 @@ Supabase authentication, workspace membership, role-based database access, stora
 AI text/image generation, video rendering, social publishing, and social-platform analytics are not connected to external providers yet. Generated content and video previews are demo/template output; campaign metrics are manually entered. See [`PROJECT_STATUS.md`](./PROJECT_STATUS.md) for what is implemented and what remains.
 
 Research and design references: [`docs/FEASIBILITY.md`](./docs/FEASIBILITY.md), [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md), [`docs/PLATFORM_API_MATRIX.md`](./docs/PLATFORM_API_MATRIX.md), and [`docs/INFRASTRUCTURE_COMPARISON.md`](./docs/INFRASTRUCTURE_COMPARISON.md).
+
+## Phase 1A.1 update
+
+Existing installations must apply **only** the new content review migration before running the updated application. See [upgrade and verification instructions](./docs/PHASE1A_UPGRADE.md).

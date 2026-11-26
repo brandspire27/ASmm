@@ -3,7 +3,6 @@
 import React, { useState } from "react"
 import DashboardLayout from "@/components/DashboardLayout"
 import { useAppState } from "@/context/AppStateContext"
-import { Cpu, AlertTriangle, RefreshCw, CheckCircle, Zap, ShieldAlert, ZapOff } from "lucide-react"
 
 export default function RouterPage() {
   const { state, triggerFailover, resetProviderLimits, toggleProviderLimit } = useAppState()

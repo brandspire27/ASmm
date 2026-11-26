@@ -1,0 +1,13 @@
+const {test}=require('node:test');const assert=require('node:assert/strict');const fs=require('node:fs');const path=require('node:path');const ts=require('typescript');
+const source=fs.readFileSync(path.resolve(__dirname,'../src/lib/social/publishing-queue.ts'),'utf8');const mod={exports:{}};new Function('module','exports',ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2017}}).outputText)(mod,mod.exports);
+const {stageablePlans,stagePayload,pausePayload}=mod.exports;
+const plan=(i,extra={})=>({content_id:String(i),revision:1,status:'planned',planned_at:'2030-01-01T10:00:00Z',...extra});
+const job=(i,extra={})=>({id:`job${i}`,content_id:String(i),plan_revision:1,status:'held',planned_at:'2030-01-01T10:00:00Z',...extra});
+test('100 same-time plans produce 100 independent intents',()=>assert.equal(stagePayload(Array.from({length:100},(_,i)=>plan(i))).length,100));
+test('reject empty or oversized batches',()=>{for(const n of [0,101])assert.throws(()=>stagePayload(Array.from({length:n},(_,i)=>plan(i))))});
+test('reject duplicate content',()=>assert.throws(()=>stagePayload([plan(1),plan(1)])));
+test('reject cancelled and invalid revisions',()=>{for(const p of [plan(1,{status:'cancelled'}),plan(1,{revision:0}),plan(1,{revision:1.5})])assert.throws(()=>stagePayload([p]))});
+test('exclude past, cancelled and existing same revision',()=>assert.deepEqual(stageablePlans([plan(1),plan(2,{status:'cancelled'}),plan(3,{planned_at:'1960-01-01T00:00:00Z'}),plan(4)], [job(1)],0).map(p=>p.content_id),['4']));
+test('rescheduled revision can be staged separately',()=>assert.equal(stageablePlans([plan(1,{revision:2})],[job(1,{status:'superseded'})],0).length,1));
+test('100 pause payload items preserve expected state',()=>assert.equal(pausePayload(Array.from({length:100},(_,i)=>job(i,{status:i%2?'held':'paused'}))).length,100));
+test('reject historical or duplicated pause jobs',()=>{assert.throws(()=>pausePayload([job(1,{status:'superseded'})]));assert.throws(()=>pausePayload([job(1),job(1)]));assert.throws(()=>pausePayload([]))});

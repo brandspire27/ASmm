@@ -1,0 +1,20 @@
+// Run from project root: node --test verification/test_composer.cjs
+const { test }=require('node:test');
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const path=require('node:path');
+const ts=require('typescript');
+const input=fs.readFileSync(path.resolve(__dirname,'../src/lib/social/composer.ts'),'utf8');
+const compiled=ts.transpileModule(input,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2017}}).outputText;
+const mod={exports:{}};
+new Function('module','exports',compiled)(mod,mod.exports);
+const {initialVariant,validateVariant,assetFormat,count,formats,captionLimits}=mod.exports;
+const valid=(p)=>({...initialVariant(p),title:'Product launch',caption:'Hello customers',assetId:p==='instagram'||p==='youtube'?'asset-id':''});
+test('valid variants for all four platforms',()=>{for(const p of Object.keys(formats))assert.equal(validateVariant(valid(p)),null)});
+test('Instagram requires media and does not permit text-only',()=>{assert.ok(validateVariant({...valid('instagram'),assetId:''}));assert.ok(validateVariant({...valid('instagram'),format:'text',assetId:''}))});
+test('YouTube requires video',()=>assert.ok(validateVariant({...valid('youtube'),format:'image'})));
+test('Google Business rejects video in this composer',()=>assert.ok(validateVariant({...valid('google_business'),format:'video',assetId:'x'})));
+test('empty title or text is rejected',()=>{assert.ok(validateVariant({...valid('facebook'),title:'  '}));assert.ok(validateVariant({...valid('facebook'),caption:'  '}))});
+test('caption boundaries and unicode code points',()=>{for(const p of Object.keys(formats)){assert.equal(validateVariant({...valid(p),caption:'😀'.repeat(captionLimits[p])}),null);assert.ok(validateVariant({...valid(p),caption:'a'.repeat(captionLimits[p]+1)}))}assert.equal(count('😀'),1)});
+test('title limit and text attachment restriction',()=>{assert.ok(validateVariant({...valid('facebook'),title:'a'.repeat(101)}));assert.ok(validateVariant({...valid('facebook'),assetId:'x'}))});
+test('eligible file extensions',()=>{assert.equal(assetFormat('workspace/user/test.JPG'),'image');assert.equal(assetFormat('workspace/user/test.mp4'),'video');assert.equal(assetFormat('workspace/user/test.pdf'),null);assert.equal(assetFormat(undefined),null)});

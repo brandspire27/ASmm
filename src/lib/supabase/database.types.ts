@@ -183,45 +183,66 @@ export interface Database {
         }
         Relationships: []
       }
+      publishing_jobs: {
+        Row: { id: string; content_id: string; workspace_id: string; client_id: string; plan_revision: number; planned_at: string; timezone: string; delivery_kind: "post" | "reel" | "video" | "short"; platform: "facebook" | "instagram" | "youtube" | "google_business"; status: "held" | "paused" | "superseded" | "cancelled"; staged_by: string | null; created_at: string; updated_at: string }
+        Insert: never
+        Update: never
+        Relationships: []
+      }
+      post_schedule_plans: {
+        Row: { content_id: string; workspace_id: string; client_id: string; planned_at: string; timezone: string; delivery_kind: "post" | "reel" | "video" | "short"; status: "planned" | "cancelled"; revision: number; updated_by: string | null; updated_at: string }
+        Insert: never
+        Update: never
+        Relationships: []
+      }
       generated_content: {
         Row: {
           id: string
           workspace_id: string
           client_id: string
           client_name: string
-          type: "strategy" | "caption" | "hashtag" | "ad_script" | "thumbnail" | "video"
+          type: "strategy" | "caption" | "hashtag" | "ad_script" | "thumbnail" | "video" | "manual_post"
           title: string
           content: string
           meta: Json
-          status: "draft" | "approved" | "rejected" | "published"
+          status: "draft" | "approved" | "rejected" | "unverified"
           provider_used: string
           created_at: string
+          post_batch_id: string | null
+          post_asset_id: string | null
+          post_created_by: string | null
         }
         Insert: {
           id?: string
           workspace_id: string
           client_id: string
           client_name: string
-          type: "strategy" | "caption" | "hashtag" | "ad_script" | "thumbnail" | "video"
+          type: "strategy" | "caption" | "hashtag" | "ad_script" | "thumbnail" | "video" | "manual_post"
           title: string
           content: string
           meta?: Json
-          status?: "draft" | "approved" | "rejected" | "published"
+          status?: "draft" | "approved" | "rejected" | "unverified"
           provider_used: string
           created_at?: string
+          post_batch_id?: string | null
+          post_asset_id?: string | null
+          post_created_by?: string | null
         }
         Update: {
           id?: string
           workspace_id?: string
           client_id?: string
           client_name?: string
-          type?: "strategy" | "caption" | "hashtag" | "ad_script" | "thumbnail" | "video"
+          type?: "strategy" | "caption" | "hashtag" | "ad_script" | "thumbnail" | "video" | "manual_post"
           title?: string
           content?: string
           meta?: Json
-          status?: "draft" | "approved" | "rejected" | "published"
+          status?: "draft" | "approved" | "rejected" | "unverified"
           provider_used?: string
           created_at?: string
+          post_batch_id?: string | null
+          post_asset_id?: string | null
+          post_created_by?: string | null
         }
         Relationships: []
       }
@@ -456,6 +477,26 @@ export interface Database {
     }
     Views: Record<string, never>
     Functions: {
+      set_client_access: {
+        Args: { p_workspace_id: string; p_client_id: string; p_email: string; p_granted: boolean }
+        Returns: boolean
+      }
+      has_client_scope: {
+        Args: { p_workspace_id: string; p_client_id: string }
+        Returns: boolean
+      }
+      stage_publishing_jobs: { Args: { p_workspace_id: string; p_client_id: string; p_items: Json }; Returns: number }
+      set_publishing_job_pause: { Args: { p_workspace_id: string; p_client_id: string; p_items: Json; p_paused: boolean }; Returns: number }
+      save_schedule_plans: { Args: { p_workspace_id: string; p_client_id: string; p_items: Json }; Returns: number }
+      cancel_schedule_plans: { Args: { p_workspace_id: string; p_client_id: string; p_items: Json }; Returns: number }
+      create_manual_posts: {
+        Args: { p_workspace_id: string; p_client_id: string; p_batch_id: string; p_variants: Json }
+        Returns: Database["public"]["Tables"]["generated_content"]["Row"][]
+      }
+      review_generated_content: {
+        Args: { p_workspace_id: string; p_content_id: string; p_decision: string }
+        Returns: string
+      }
       create_organization: {
         Args: { p_organization_name: string; p_workspace_name?: string }
         Returns: Array<{ organization_id: string; workspace_id: string }>

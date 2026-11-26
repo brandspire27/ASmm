@@ -1,0 +1,8 @@
+# Append these to your EXISTING .env.local. Never commit actual secrets.
+# SUPABASE_SERVICE_ROLE_KEY may already be defined; do not duplicate it.
+SUPABASE_SERVICE_ROLE_KEY=
+SOCIAL_APP_URL=http://localhost:3000
+META_APP_ID=
+META_APP_SECRET=
+META_GRAPH_API_VERSION=v27.0
+SOCIAL_TOKEN_ENCRYPTION_KEY=

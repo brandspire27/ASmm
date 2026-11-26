@@ -11,8 +11,6 @@ import {
   CheckSquare,
   ArrowRight,
   PlusCircle,
-  Video,
-  PenTool,
   ChevronRight,
   Eye
 } from "lucide-react"

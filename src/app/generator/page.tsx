@@ -4,15 +4,16 @@ import React, { useState } from "react"
 import DashboardLayout from "@/components/DashboardLayout"
 import { useAppState, GeneratedContent } from "@/context/AppStateContext"
 import BrandLogo from "@/components/BrandLogo"
-import { PenTool, Image as ImageIcon, Send, ArrowRight, Eye, RefreshCw, Layers, CheckCircle } from "lucide-react"
+import { PenTool, RefreshCw, Layers, CheckCircle } from "lucide-react"
 
 export default function GeneratorPage() {
   const { state, generateAIContent, updateContentStatus } = useAppState()
   
+  const canReview = ["workspace_owner", "workspace_admin", "social_media_manager", "content_approver"].includes(state.activeRole ?? "")
   const activeClient = state.clients.find((c) => c.id === state.activeClientId)
 
   // Form states
-  const [generationType, setGenerationType] = useState<GeneratedContent["type"]>("strategy")
+  const [generationType, setGenerationType] = useState<Exclude<GeneratedContent["type"], "manual_post">>("strategy")
   const [prompt, setPrompt] = useState("")
   const [isGenerating, setIsGenerating] = useState(false)
   const [latestAsset, setLatestAsset] = useState<GeneratedContent | null>(null)
@@ -60,7 +61,6 @@ export default function GeneratorPage() {
 
     setIsGenerating(true)
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1200))
       const result = await generateAIContent(activeClient.id, generationType, prompt)
       setLatestAsset(result)
       setPrompt("")
@@ -74,7 +74,7 @@ export default function GeneratorPage() {
   }
 
   const handleApprove = async () => {
-    if (latestAsset) {
+    if (latestAsset && canReview && latestAsset.status === "draft") {
       try {
         await updateContentStatus(latestAsset.id, "approved")
         setNotification("Asset approval saved to the shared workspace.")
@@ -87,13 +87,12 @@ export default function GeneratorPage() {
   }
 
   const handleRegenerate = async () => {
-    if (latestAsset && activeClient) {
+    if (latestAsset && activeClient && latestAsset.type !== "manual_post") {
       setIsGenerating(true)
       const oldType = latestAsset.type
       const oldPrompt = latestAsset.title.replace(`${oldType.toUpperCase()} - `, "").replace("...", "")
 
       try {
-        await new Promise((resolve) => setTimeout(resolve, 1000))
         const result = await generateAIContent(activeClient.id, oldType, oldPrompt + " (V2 Regenerated)")
         setLatestAsset(result)
         setNotification("Regenerated demo output saved to the shared workspace.")
@@ -150,7 +149,7 @@ export default function GeneratorPage() {
                     <select
                       value={generationType}
                       onChange={(e) => {
-                        setGenerationType(e.target.value as GeneratedContent["type"])
+                        setGenerationType(e.target.value as Exclude<GeneratedContent["type"], "manual_post">)
                         setPrompt("")
                       }}
                       className="w-full rounded-md border border-border bg-secondary/30 py-2 px-3 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
@@ -303,7 +302,7 @@ export default function GeneratorPage() {
                       Regenerate
                     </button>
 
-                    {latestAsset.status !== "approved" ? (
+                    {latestAsset.status === "draft" && canReview ? (
                       <button
                         onClick={handleApprove}
                         className="inline-flex items-center gap-1.5 rounded-md bg-emerald-600 px-5 py-2 text-xs font-bold text-white hover:bg-emerald-500 transition ml-auto"
@@ -311,12 +310,12 @@ export default function GeneratorPage() {
                         <CheckCircle className="h-3.5 w-3.5" />
                         Approve Asset
                       </button>
-                    ) : (
+                    ) : latestAsset.status === "approved" ? (
                       <span className="text-xs text-emerald-500 font-bold flex items-center gap-1.5 ml-auto bg-emerald-500/10 px-3 py-1.5 rounded border border-emerald-500/20">
                         <CheckCircle className="h-4 w-4" />
                         Approved
                       </span>
-                    )}
+                    ) : <span className="text-xs text-muted-foreground">Review in Approvals</span>}
                   </div>
                 </div>
               ) : (

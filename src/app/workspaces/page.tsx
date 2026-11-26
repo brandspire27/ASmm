@@ -3,6 +3,7 @@
 import React, { useMemo, useState } from "react"
 import DashboardLayout from "@/components/DashboardLayout"
 import { useAppState } from "@/context/AppStateContext"
+import { createClient } from "@/lib/supabase/client"
 
 export default function WorkspacesPage() {
   const { state, createOrganization, createWorkspace, inviteWorkspaceMember, switchWorkspace } = useAppState()
@@ -11,6 +12,9 @@ export default function WorkspacesPage() {
   const [workspaceName, setWorkspaceName] = useState("")
   const [timezone, setTimezone] = useState(() => Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC")
   const [inviteEmail, setInviteEmail] = useState("")
+  const [accessEmail, setAccessEmail] = useState("")
+  const [accessClientId, setAccessClientId] = useState("")
+  const [isSavingAccess, setIsSavingAccess] = useState(false)
   const [inviteRole, setInviteRole] = useState("content_creator")
   const [message, setMessage] = useState("")
   const [error, setError] = useState("")
@@ -86,6 +90,33 @@ export default function WorkspacesPage() {
       setError(inviteError instanceof Error ? inviteError.message : "Unable to send the invitation.")
     } finally {
       setIsInviting(false)
+    }
+  }
+
+  const handleClientAccess = async (granted: boolean) => {
+    if (!canInviteMembers || !activeWorkspace || isSavingAccess) return
+    if (!state.clients.some((client) => client.id === accessClientId) || !accessEmail.trim()) {
+      setError("Select a client and enter the confirmed member email.")
+      return
+    }
+    setMessage("")
+    setError("")
+    setIsSavingAccess(true)
+    try {
+      const supabase = createClient()
+      if (!supabase) throw new Error("Supabase is not configured.")
+      const { error } = await supabase.rpc("set_client_access", {
+        p_workspace_id: activeWorkspace.workspaceId,
+        p_client_id: accessClientId,
+        p_email: accessEmail.trim(),
+        p_granted: granted
+      })
+      if (error) throw new Error(error.message)
+      setMessage(granted ? "Client access granted for the selected record." : "Client access revoked for the selected record.")
+    } catch (accessError) {
+      setError(accessError instanceof Error ? accessError.message : "Unable to change client access.")
+    } finally {
+      setIsSavingAccess(false)
     }
   }
 
@@ -177,7 +208,7 @@ export default function WorkspacesPage() {
             <div>
               <h3 className="font-semibold text-foreground">Invite a team member</h3>
               <p className="mt-1 text-xs text-muted-foreground">
-                The invitation grants access only to {activeWorkspace.workspaceName}.
+                The invitation grants workspace membership in {activeWorkspace.workspaceName}. Client-role members require a separate client assignment after accepting.
               </p>
             </div>
             <div className="grid gap-4 md:grid-cols-2">
@@ -205,6 +236,27 @@ export default function WorkspacesPage() {
           </form>
         )}
 
+        {canInviteMembers && activeWorkspace && (
+          <section className="space-y-4 rounded-lg border border-border bg-card p-6">
+            <h3 className="font-semibold text-foreground">Client access assignments</h3>
+            <p className="text-xs text-muted-foreground">After a client-role member accepts their invitation, grant access to individual client records. Unassigned external clients cannot read client content or analytics. Internal staff retain workspace-wide permissions.</p>
+            <label className="block space-y-1 text-xs font-semibold text-muted-foreground">
+              <span>Client record</span>
+              <select value={state.clients.some((client) => client.id === accessClientId) ? accessClientId : ""} onChange={(event) => setAccessClientId(event.target.value)} className="w-full rounded-md border border-border bg-secondary/40 px-3 py-2 text-sm text-foreground">
+                <option value="">Select client</option>
+                {state.clients.map((client) => <option key={client.id} value={client.id}>{client.name}</option>)}
+              </select>
+            </label>
+            <label className="block space-y-1 text-xs font-semibold text-muted-foreground">
+              <span>Confirmed client member email</span>
+              <input type="email" value={accessEmail} onChange={(event) => setAccessEmail(event.target.value)} className="w-full rounded-md border border-border bg-secondary/40 px-3 py-2 text-sm text-foreground" />
+            </label>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" disabled={isSavingAccess || !state.clients.some((client) => client.id === accessClientId) || !accessEmail.trim()} onClick={() => void handleClientAccess(true)} className="rounded-md bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-50">Grant access</button>
+              <button type="button" disabled={isSavingAccess || !state.clients.some((client) => client.id === accessClientId) || !accessEmail.trim()} onClick={() => void handleClientAccess(false)} className="rounded-md border border-border px-4 py-2 text-xs font-semibold disabled:opacity-50">Revoke access</button>
+            </div>
+          </section>
+        )}
         {organizations.length > 0 && (
           <p className="text-xs text-muted-foreground">
             You belong to {organizations.length} organization{organizations.length === 1 ? "" : "s"}.

@@ -3,7 +3,7 @@
 import React, { useState } from "react"
 import DashboardLayout from "@/components/DashboardLayout"
 import { useAppState, BrandAsset } from "@/context/AppStateContext"
-import { Briefcase, UploadCloud, PlusCircle, Trash2, Image as ImageIcon, Link as LinkIcon, FileCheck } from "lucide-react"
+import { Briefcase, UploadCloud, Trash2, Link as LinkIcon, FileCheck } from "lucide-react"
 
 export default function AssetsPage() {
   const { state, addBrandAsset, uploadBrandAsset, deleteBrandAsset } = useAppState()

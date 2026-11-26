@@ -2,3 +2,9 @@ node_modules
 .next
 .env*
 !.env.example
+
+*.tsbuildinfo
+*.bak
+*.log
+*.pem
+*.key

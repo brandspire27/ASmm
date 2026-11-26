@@ -1,0 +1,12 @@
+const {test}=require('node:test');const assert=require('node:assert/strict');const fs=require('node:fs');const path=require('node:path');const ts=require('typescript');
+process.env.TZ='Asia/Kolkata';
+const source=fs.readFileSync(path.resolve(__dirname,'../src/lib/social/calendar.ts'),'utf8');const mod={exports:{}};new Function('module','exports',ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2017}}).outputText)(mod,mod.exports);
+const {MAX_BATCH,toFutureUtc,spacedTimes,deliveryKinds,localInput}=mod.exports;const start='2030-01-01T10:00',now=0;
+test('100 same-minute plans',()=>{assert.equal(MAX_BATCH,100);const times=spacedTimes(start,0,100,now);assert.equal(times.length,100);assert.equal(new Set(times).size,1)});
+test('100 staggered plans cross days',()=>{const times=spacedTimes(start,60,100,now);assert.equal(new Set(times).size,100);assert.equal(times[99],'2030-01-05T13:00')});
+test('reject count above cap, empty, fractional',()=>{for(const n of [0,101,1.5])assert.throws(()=>spacedTimes(start,0,n,now))});
+test('reject invalid spacing',()=>{for(const n of [-1,1.5,10081,NaN])assert.throws(()=>spacedTimes(start,n,2,now))});
+test('UTC conversion from IST',()=>assert.equal(toFutureUtc(start,now),'2030-01-01T04:30:00.000Z'));
+test('reject malformed, nonexistent calendar date, past',()=>{for(const value of ['', '2030-02-30T10:00','2030-01-01T25:00','1960-01-01T10:00'])assert.throws(()=>toFutureUtc(value,now))});
+test('platform format choices',()=>{assert.deepEqual(deliveryKinds('instagram','video'),['reel']);assert.deepEqual(deliveryKinds('facebook','video'),['video','reel']);assert.deepEqual(deliveryKinds('youtube','video'),['video','short']);assert.deepEqual(deliveryKinds('google_business','video'),[]);assert.deepEqual(deliveryKinds('facebook','image'),['post'])});
+test('DST gaps and folds rejected',()=>{process.env.TZ='America/New_York';try{assert.throws(()=>toFutureUtc('2030-03-10T02:30',now));assert.throws(()=>toFutureUtc('2030-11-03T01:30',now));assert.equal(localInput(new Date(toFutureUtc('2030-11-03T03:30',now))),'2030-11-03T03:30')}finally{process.env.TZ='Asia/Kolkata'}});

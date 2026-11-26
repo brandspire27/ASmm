@@ -47,17 +47,21 @@ export interface GeneratedContentMeta {
   colorHex?: string
   videoUrl?: string
   status?: string
+  platform?: string
+  format?: string
+  assetId?: string
+  assetName?: string
 }
 
 export interface GeneratedContent {
   id: string
   clientId: string
   clientName: string
-  type: "strategy" | "caption" | "hashtag" | "ad_script" | "thumbnail" | "video"
+  type: "strategy" | "caption" | "hashtag" | "ad_script" | "thumbnail" | "video" | "manual_post"
   title: string
   content: string
   meta?: GeneratedContentMeta
-  status: "draft" | "approved" | "rejected" | "published"
+  status: "draft" | "approved" | "rejected" | "unverified"
   providerUsed: string
   createdAt: string
 }
@@ -158,13 +162,14 @@ interface AppContextType {
   ) => Promise<void>
   generateAIContent: (
     clientId: string,
-    type: GeneratedContent["type"],
+    type: Exclude<GeneratedContent["type"], "manual_post">,
     prompt: string,
     additionalMeta?: GeneratedContentMeta
   ) => Promise<GeneratedContent>
+  saveManualPosts: (clientId: string, batchId: string, variants: Json) => Promise<GeneratedContent[]>
   updateContentStatus: (
     id: string,
-    status: GeneratedContent["status"]
+    status: "approved" | "rejected"
   ) => Promise<void>
   addCampaign: (
     campaign: Omit<CampaignAnalytics, "id" | "ctr" | "conversionRate" | "createdAt">
@@ -291,7 +296,7 @@ function parseContentMeta(value: Json): GeneratedContentMeta {
   const row = value as { [key: string]: Json | undefined }
   const meta: GeneratedContentMeta = {}
 
-  for (const key of ["imageUrl", "overlayText", "template", "colorHex", "videoUrl", "status"] as const) {
+  for (const key of ["imageUrl", "overlayText", "template", "colorHex", "videoUrl", "status", "platform", "format", "assetId", "assetName"] as const) {
     if (typeof row[key] === "string") meta[key] = row[key]
   }
   if (Array.isArray(row.textVariables) && row.textVariables.every((item) => typeof item === "string")) {
@@ -368,7 +373,7 @@ async function readWorkspace(user: AgencyUser, preferredWorkspaceId?: string): P
       id: row.id,
       name: row.name,
       type: row.type,
-      url: row.storage_path ? await signedStorageUrl(row.storage_path) : (row.url ?? ""),
+      url: row.storage_path ? await signedStorageUrl(row.storage_path).catch(() => "") : (row.url ?? ""),
       storagePath: row.storage_path ?? undefined,
       uploadedAt: row.uploaded_at
     }
@@ -383,7 +388,7 @@ async function readWorkspace(user: AgencyUser, preferredWorkspaceId?: string): P
     targetAudience: row.target_audience,
     brandColors: row.brand_colors,
     logoUrl: row.logo_storage_path
-      ? await signedStorageUrl(row.logo_storage_path)
+      ? (selectedWorkspace.roleKey === "client" ? undefined : await signedStorageUrl(row.logo_storage_path))
       : (row.logo_url ?? undefined),
     assets: assetsByClient.get(row.id) ?? []
   })))
@@ -990,7 +995,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
 
   const generateAIContent = async (
     clientId: string,
-    type: GeneratedContent["type"],
+    type: Exclude<GeneratedContent["type"], "manual_post">,
     prompt: string,
     additionalMeta?: GeneratedContentMeta
   ) => {
@@ -1039,7 +1044,7 @@ Narrator: "Click the button below to get started now!"`
         template: additionalMeta?.template || "Promo Ad",
         textVariables: additionalMeta?.textVariables || [prompt],
         colorHex: activeClient.brandColors[0] || "#FF4500",
-        status: "rendered",
+        status: "preview_only",
         videoUrl: "https://assets.mixkit.co/videos/preview/mixkit-stars-in-space-background-1611-large.mp4"
       }
     }
@@ -1070,16 +1075,29 @@ Narrator: "Click the button below to get started now!"`
     return result
   }
 
-  const updateContentStatus = async (id: string, status: GeneratedContent["status"]) => {
+  const saveManualPosts = async (clientId: string, batchId: string, variants: Json) => {
+    const client = getRequiredClient()
+    const workspaceId = state.activeWorkspaceId
+    const userId = state.currentUser?.id
+    if (!workspaceId || !userId) throw new Error("Select a workspace and sign in.")
+    const { data, error } = await client.rpc("create_manual_posts", { p_workspace_id: workspaceId, p_client_id: clientId, p_batch_id: batchId, p_variants: variants })
+    if (error) throw new Error(error.message)
+    if (!data?.length) throw new Error("No saved draft was confirmed. Retry without changing the inputs.")
+    const saved = data.map(mapContent)
+    setState(previous => previous.activeWorkspaceId !== workspaceId || previous.currentUser?.id !== userId ? previous : ({ ...previous, contentList: [...saved, ...previous.contentList.filter(item => !saved.some(row => row.id === item.id))] }))
+    return saved
+  }
+
+  const updateContentStatus = async (id: string, status: "approved" | "rejected") => {
     const client = getRequiredClient()
     const workspaceId = state.activeWorkspaceId
     if (!workspaceId) throw new Error("Select a workspace before updating content.")
-    const { error } = await client.from("generated_content")
-      .update({ status })
-      .eq("id", id)
-      .eq("workspace_id", workspaceId)
-    if (error) throw error
-    setState((previous) => ({
+    const { data, error } = await client.rpc("review_generated_content", {
+      p_workspace_id: workspaceId, p_content_id: id, p_decision: status
+    })
+    if (error) throw new Error(error.message)
+    if (data !== status) throw new Error("Review was not confirmed by the database.")
+    setState((previous) => previous.activeWorkspaceId !== workspaceId ? previous : ({
       ...previous,
       contentList: previous.contentList.map((item) => item.id === id ? { ...item, status } : item)
     }))
@@ -1140,6 +1158,7 @@ Narrator: "Click the button below to get started now!"`
         resetProviderLimits,
         toggleProviderLimit,
         generateAIContent,
+        saveManualPosts,
         updateContentStatus,
         addCampaign
       }}

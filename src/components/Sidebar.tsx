@@ -19,7 +19,8 @@ import {
   Building,
   Settings2,
   Radio,
-  Image as ImageIcon
+  CalendarDays,
+  ListOrdered
 } from "lucide-react"
 
 export default function Sidebar({ onNavigate = () => {} }: { onNavigate?: () => void }) {
@@ -32,8 +33,12 @@ export default function Sidebar({ onNavigate = () => {} }: { onNavigate?: () => 
     { label: "Brand Profile", href: "/brand", icon: Building },
     { label: "Workspaces", href: "/workspaces", icon: Settings2 },
     { label: "Client Manager", href: "/clients", icon: Users },
+    ...(["workspace_owner", "workspace_admin"].includes(state.activeRole ?? "") ? [{ label: "Social Accounts", href: "/social-accounts", icon: Radio }] : []),
     { label: "Brand Assets", href: "/assets", icon: Briefcase },
     { label: "AI Router", href: "/router", icon: Cpu },
+    ...(["workspace_owner", "workspace_admin", "social_media_manager", "content_creator"].includes(state.activeRole ?? "") ? [{ label: "Create Post", href: "/create-post", icon: PenTool }] : []),
+    ...(["workspace_owner", "workspace_admin", "social_media_manager"].includes(state.activeRole ?? "") ? [{ label: "Content Calendar", href: "/calendar", icon: CalendarDays }] : []),
+    ...(["workspace_owner", "workspace_admin", "social_media_manager"].includes(state.activeRole ?? "") ? [{ label: "Publishing Queue", href: "/publishing-queue", icon: ListOrdered }] : []),
     { label: "Content Generator", href: "/generator", icon: PenTool },
     { label: "Video Generator", href: "/videos", icon: Video },
     { label: "Approvals", href: "/approval", icon: CheckSquare },

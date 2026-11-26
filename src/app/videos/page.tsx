@@ -4,7 +4,7 @@ import React, { useState } from "react"
 import DashboardLayout from "@/components/DashboardLayout"
 import { useAppState, GeneratedContent } from "@/context/AppStateContext"
 import BrandLogo from "@/components/BrandLogo"
-import { Video, Play, RefreshCw, Layers, CheckCircle, Sliders, Film } from "lucide-react"
+import { Video, Play, RefreshCw, Layers, Sliders, Film } from "lucide-react"
 
 export default function VideosPage() {
   const { state, generateAIContent } = useAppState()
@@ -19,8 +19,6 @@ export default function VideosPage() {
   
   // Pipeline Rendering states
   const [isRendering, setIsRendering] = useState(false)
-  const [renderProgress, setRenderProgress] = useState(0)
-  const [renderLogs, setRenderLogs] = useState<string[]>([])
   const [completedVideo, setCompletedVideo] = useState<GeneratedContent | null>(null)
   const [notification, setNotification] = useState("")
 
@@ -57,7 +55,7 @@ export default function VideosPage() {
     }
   }
 
-  const triggerRenderPipeline = (e: React.FormEvent) => {
+  const triggerRenderPipeline = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!activeClient) {
       alert("Please select a focused client in the sidebar.")
@@ -69,40 +67,21 @@ export default function VideosPage() {
     }
 
     setIsRendering(true)
-    setRenderProgress(10)
-    setRenderLogs(["Preparing a template demo preview. No video-rendering service is connected."])
-
-    const steps = [
-      { progress: 25, log: "Loading the selected demo template..." },
-      { progress: 45, log: `Applying preview text and color: "${headline}", "${accentColor || "#FF4500"}"` },
-      { progress: 65, log: "Preparing preview overlays..." },
-      { progress: 85, log: "Saving preview details to the shared workspace..." },
-      { progress: 100, log: "Demo preview ready. No MP4 was rendered." }
-    ]
-
-    steps.forEach((step, idx) => {
-      setTimeout(async () => {
-        setRenderProgress(step.progress)
-        setRenderLogs((prev) => [...prev, step.log])
-        
-        if (step.progress === 100) {
-          try {
-            const videoAsset = await generateAIContent(activeClient.id, "video", `${template} - ${headline}`, {
-              template,
-              textVariables: [headline, subHeadline],
-              colorHex: accentColor || "#FF4500"
-            })
-            setCompletedVideo(videoAsset)
-            setNotification("Demo preview details saved. Connect a rendering provider to create an MP4.")
-            setTimeout(() => setNotification(""), 4000)
-          } catch (error) {
-            setNotification(error instanceof Error ? error.message : "Unable to save the demo preview.")
-          } finally {
-            setIsRendering(false)
-          }
-        }
-      }, (idx + 1) * 900)
-    })
+    setCompletedVideo(null)
+    setNotification("")
+    try {
+      const videoAsset = await generateAIContent(activeClient.id, "video", `${template} - ${headline}`, {
+        template,
+        textVariables: [headline, subHeadline],
+        colorHex: accentColor || "#FF4500"
+      })
+      setCompletedVideo(videoAsset)
+      setNotification("Demo preview details saved. No MP4 was rendered.")
+    } catch (error) {
+      setNotification(error instanceof Error ? error.message : "Unable to save the demo preview.")
+    } finally {
+      setIsRendering(false)
+    }
   }
 
   return (
@@ -252,7 +231,7 @@ export default function VideosPage() {
                     {isRendering ? (
                       <>
                         <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                        Preparing preview: {renderProgress}%
+                        Saving preview details...
                       </>
                     ) : (
                       <>
@@ -276,32 +255,7 @@ export default function VideosPage() {
                     Demo Preview Preparation
                   </h3>
 
-                  {/* Progress Bar */}
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-xs">
-                      <span className="text-muted-foreground font-semibold">                      Preparing demo preview</span>
-                      <span className="font-bold font-mono text-primary">{renderProgress}%</span>
-                    </div>
-                    <div className="w-full bg-secondary h-2.5 rounded overflow-hidden">
-                      <div
-                        className="bg-primary h-full transition-all duration-300"
-                        style={{ width: `${renderProgress}%` }}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Log Console */}
-                  <div className="bg-black/90 text-emerald-400 font-mono text-[11px] p-4 rounded border border-border space-y-1.5 min-h-[140px] leading-relaxed">
-                    <div className="text-muted-foreground border-b border-border pb-1.5 mb-1.5 text-[10px]">
-                      SYSTEM DISPATCH CONSOLE LOGS
-                    </div>
-                    {renderLogs.map((log, idx) => (
-                      <div key={idx} className="flex gap-2">
-                        <span className="text-muted-foreground select-none">[{idx + 1}]</span>
-                        <span>{log}</span>
-                      </div>
-                    ))}
-                  </div>
+                  <p className="text-xs text-muted-foreground">Saving template metadata to the workspace. No video rendering is taking place.</p>
                 </div>
               )}
 
@@ -339,10 +293,10 @@ export default function VideosPage() {
                         className="text-base md:text-xl font-black uppercase tracking-tight leading-tight"
                         style={{ color: completedVideo.meta?.colorHex }}
                       >
-                        {headline || completedVideo.meta?.textVariables?.[0]}
+                        {completedVideo.meta?.textVariables?.[0]}
                       </h2>
                       <p className="text-[10px] md:text-xs text-white font-medium mt-0.5">
-                        {subHeadline || completedVideo.meta?.textVariables?.[1]}
+                        {completedVideo.meta?.textVariables?.[1]}
                       </p>
                     </div>
                   </div>
@@ -360,7 +314,7 @@ export default function VideosPage() {
 
                     <div className="flex gap-2">
                       <span className="text-[10px] font-bold bg-primary/20 text-primary px-2.5 py-1 rounded font-mono uppercase">
-                        Render OK
+                        PREVIEW ONLY
                       </span>
                     </div>
                   </div>
